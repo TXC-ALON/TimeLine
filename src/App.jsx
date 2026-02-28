@@ -61,6 +61,26 @@ const categoryPalette = {
   明清: '#8f5b2f'
 }
 
+const DEFAULT_DISPLAY_SETTINGS = {
+  showAxisEdgeYears: true,
+  showTrackEdgeYears: true,
+  showRulerListLifeYears: true,
+  showReignYears: true,
+  showTicks: true,
+  showPeriodBands: true,
+  showTooltips: true
+}
+
+const DISPLAY_SETTING_ITEMS = [
+  { key: 'showAxisEdgeYears', label: '显示时间轴首尾年份' },
+  { key: 'showTrackEdgeYears', label: '显示每行首尾年份' },
+  { key: 'showRulerListLifeYears', label: '左侧显示君主生卒' },
+  { key: 'showReignYears', label: '显示在位年数标记' },
+  { key: 'showTicks', label: '显示刻度线与年份' },
+  { key: 'showPeriodBands', label: '显示分期背景色带' },
+  { key: 'showTooltips', label: '显示悬浮详情提示' }
+]
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
@@ -74,6 +94,19 @@ function formatYear(year) {
     return '未知'
   }
   return year < 0 ? `公元前${Math.abs(year)}年` : `公元${year}年`
+}
+
+function formatAxisYear(year) {
+  if (typeof year !== 'number') {
+    return '未知'
+  }
+  return year < 0 ? `前${Math.abs(year)}` : `${year}`
+}
+
+function formatCompactLifeYears(birthYear, deathYear, fallbackStart, fallbackEnd) {
+  const start = typeof birthYear === 'number' ? birthYear : fallbackStart
+  const end = typeof deathYear === 'number' ? deathYear : fallbackEnd
+  return `${formatAxisYear(start)} - ${formatAxisYear(end)}`
 }
 
 function formatPeriod(start, end) {
@@ -331,6 +364,7 @@ function App() {
   const [tooltip, setTooltip] = useState(null)
   const [subTimelineId, setSubTimelineId] = useState(null)
   const [highlightedRulerKey, setHighlightedRulerKey] = useState(null)
+  const [displaySettings, setDisplaySettings] = useState(DEFAULT_DISPLAY_SETTINGS)
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -454,11 +488,12 @@ function App() {
   const timelineWidth = LABEL_WIDTH + totalYears * zoom + 64
   const yearTicks = useMemo(() => getYearTicks(axisMinYear, axisMaxYear), [axisMaxYear, axisMinYear])
   const periodBands = useMemo(() => {
-    if (isSubTimeline) {
+    if (isSubTimeline || !displaySettings.showPeriodBands) {
       return []
     }
     return PERIOD_BANDS.filter((item) => overlap(item.startYear, item.endYear, TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR))
-  }, [isSubTimeline])
+  }, [displaySettings.showPeriodBands, isSubTimeline])
+  const axisEndX = LABEL_WIDTH + totalYears * zoom
 
   const getXByYear = (year) => {
     const clampedYear = clamp(year, axisMinYear, axisMaxYear)
@@ -535,6 +570,9 @@ function App() {
   }
 
   const showTooltip = (event, title, lines) => {
+    if (!displaySettings.showTooltips) {
+      return
+    }
     setTooltip({
       title,
       lines,
@@ -544,6 +582,9 @@ function App() {
   }
 
   const moveTooltip = (event) => {
+    if (!displaySettings.showTooltips) {
+      return
+    }
     setTooltip((current) =>
       current
         ? {
@@ -558,6 +599,12 @@ function App() {
   const hideTooltip = () => {
     setTooltip(null)
   }
+
+  useEffect(() => {
+    if (!displaySettings.showTooltips) {
+      setTooltip(null)
+    }
+  }, [displaySettings.showTooltips])
 
   const handleWindowStartChange = (value) => {
     const nextStart = Number(value)
@@ -592,6 +639,13 @@ function App() {
     setSelectedKey(`dynasty:${dynastyId}`)
   }
 
+  const toggleDisplaySetting = (settingKey) => {
+    setDisplaySettings((current) => ({
+      ...current,
+      [settingKey]: !current[settingKey]
+    }))
+  }
+
   const expandAllFiltered = () => {
     setExpandedDynasties(new Set(displayDynasties.map((item) => item.id)))
   }
@@ -607,6 +661,32 @@ function App() {
     setSubTimelineId(null)
     setZoom(DEFAULT_SCALE)
     setHighlightedRulerKey(null)
+  }
+
+  const resetView = () => {
+    if (timelineViewportRef.current && Math.abs(zoom - DEFAULT_SCALE) < 0.0001) {
+      timelineViewportRef.current.scrollLeft = 0
+      return
+    }
+    pendingScrollLeftRef.current = 0
+    setZoom(DEFAULT_SCALE)
+  }
+
+  const fitViewToCurrentRange = () => {
+    if (!timelineViewportRef.current) {
+      return
+    }
+    const viewport = timelineViewportRef.current
+    const spanYears = Math.max(1, axisMaxYear - axisMinYear)
+    const usableWidth = Math.max(220, viewport.clientWidth - LABEL_WIDTH - 48)
+    const fitZoom = clamp(Number((usableWidth / spanYears).toFixed(4)), MIN_SCALE, MAX_SCALE)
+
+    if (Math.abs(fitZoom - zoom) < 0.0001) {
+      viewport.scrollLeft = 0
+      return
+    }
+    pendingScrollLeftRef.current = 0
+    setZoom(fitZoom)
   }
 
   const handlePointerDown = (event) => {
@@ -689,89 +769,122 @@ function App() {
       </header>
 
       <section className="control-panel">
-        <div className="control-block">
-          <label htmlFor="search-input">搜索（朝代 / 君主 / 名号）</label>
-          <input
-            id="search-input"
-            type="text"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="例如：汉武帝、五代、康熙"
-          />
+        <div className="quick-actions">
+          <button className="secondary-btn quick-btn" type="button" onClick={resetView}>
+            重置视图
+          </button>
+          <button className="secondary-btn quick-btn" type="button" onClick={fitViewToCurrentRange}>
+            适应视图缩放
+          </button>
         </div>
 
-        <div className="control-block">
-          <label htmlFor="zoom-range">时间轴缩放（每年像素）: {zoom.toFixed(2)}</label>
-          <input
-            id="zoom-range"
-            type="range"
-            min={MIN_SCALE}
-            max={MAX_SCALE}
-            step={0.05}
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
-        </div>
+        <details className="settings-menu">
+          <summary className="settings-summary">
+            <span>Settings</span>
+            <span className="settings-hint">搜索、过滤、显示开关</span>
+          </summary>
+          <div className="settings-body">
+            <div className="control-block">
+              <label htmlFor="search-input">搜索（朝代 / 君主 / 名号）</label>
+              <input
+                id="search-input"
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="例如：汉武帝、五代、康熙"
+              />
+            </div>
 
-        <div className="control-block">
-          <label htmlFor="window-start">时间段过滤</label>
-          <div className="range-labels">
-            <span>{formatYear(windowStart)}</span>
-            <span>{formatYear(windowEnd)}</span>
-          </div>
-          <input
-            id="window-start"
-            type="range"
-            min={TIMELINE_MIN_YEAR}
-            max={TIMELINE_MAX_YEAR}
-            value={windowStart}
-            onChange={(event) => handleWindowStartChange(event.target.value)}
-          />
-          <input
-            type="range"
-            min={TIMELINE_MIN_YEAR}
-            max={TIMELINE_MAX_YEAR}
-            value={windowEnd}
-            onChange={(event) => handleWindowEndChange(event.target.value)}
-          />
-        </div>
+            <div className="control-block">
+              <label htmlFor="zoom-range">时间轴缩放（每年像素）: {zoom.toFixed(2)}</label>
+              <input
+                id="zoom-range"
+                type="range"
+                min={MIN_SCALE}
+                max={MAX_SCALE}
+                step={0.05}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+              />
+            </div>
 
-        <div className="control-block">
-          <label>时代分类过滤（至少保留一项）</label>
-          <div className="dynasty-grid">
-            {categories.map((category) => {
-              const active = activeCategories.includes(category)
-              return (
-                <button
-                  key={category}
-                  className={`dynasty-chip ${active ? 'active' : ''}`}
-                  onClick={() => toggleCategory(category)}
-                  type="button"
-                  aria-pressed={active}
-                >
-                  {category}
+            <div className="control-block">
+              <label htmlFor="window-start">时间段过滤</label>
+              <div className="range-labels">
+                <span>{formatYear(windowStart)}</span>
+                <span>{formatYear(windowEnd)}</span>
+              </div>
+              <input
+                id="window-start"
+                type="range"
+                min={TIMELINE_MIN_YEAR}
+                max={TIMELINE_MAX_YEAR}
+                value={windowStart}
+                onChange={(event) => handleWindowStartChange(event.target.value)}
+              />
+              <input
+                type="range"
+                min={TIMELINE_MIN_YEAR}
+                max={TIMELINE_MAX_YEAR}
+                value={windowEnd}
+                onChange={(event) => handleWindowEndChange(event.target.value)}
+              />
+            </div>
+
+            <div className="control-block">
+              <label>时代分类过滤（至少保留一项）</label>
+              <div className="dynasty-grid">
+                {categories.map((category) => {
+                  const active = activeCategories.includes(category)
+                  return (
+                    <button
+                      key={category}
+                      className={`dynasty-chip ${active ? 'active' : ''}`}
+                      onClick={() => toggleCategory(category)}
+                      type="button"
+                      aria-pressed={active}
+                    >
+                      {category}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="control-block">
+              <label>显示设置</label>
+              <div className="settings-grid">
+                {DISPLAY_SETTING_ITEMS.map((item) => (
+                  <label key={item.key} className="setting-item">
+                    <input
+                      type="checkbox"
+                      checked={displaySettings[item.key]}
+                      onChange={() => toggleDisplaySetting(item.key)}
+                    />
+                    <span>{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="button-row">
+              <button className="secondary-btn" type="button" onClick={resetFilters}>
+                重置筛选
+              </button>
+              {isSubTimeline ? (
+                <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
+                  退出子时间轴
                 </button>
-              )
-            })}
+              ) : null}
+              <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
+                展开当前结果
+              </button>
+              <button className="secondary-btn" type="button" onClick={collapseAll}>
+                收起全部
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="button-row">
-          <button className="secondary-btn" type="button" onClick={resetFilters}>
-            重置筛选
-          </button>
-          {isSubTimeline ? (
-            <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
-              退出子时间轴
-            </button>
-          ) : null}
-          <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
-            展开当前结果
-          </button>
-          <button className="secondary-btn" type="button" onClick={collapseAll}>
-            收起全部
-          </button>
-        </div>
+        </details>
       </section>
 
       <section className="layout-grid">
@@ -813,17 +926,30 @@ function App() {
 
               <div className="axis-line" style={{ left: `${LABEL_WIDTH}px` }} />
 
-              {yearTicks.map((year) => {
-                const x = getXByYear(year)
-                return (
-                  <div key={year} className="tick">
-                    <div className="tick-line" style={{ left: `${x}px` }} />
-                    <div className="tick-label" style={{ left: `${x}px` }}>
-                      {year < 0 ? `前${Math.abs(year)}` : year}
-                    </div>
+              {displaySettings.showAxisEdgeYears ? (
+                <>
+                  <div className="axis-end-label start" style={{ left: `${LABEL_WIDTH}px` }}>
+                    {formatAxisYear(axisMinYear)}
                   </div>
-                )
-              })}
+                  <div className="axis-end-label end" style={{ left: `${axisEndX}px` }}>
+                    {formatAxisYear(axisMaxYear)}
+                  </div>
+                </>
+              ) : null}
+
+              {displaySettings.showTicks
+                ? yearTicks.map((year) => {
+                    const x = getXByYear(year)
+                    return (
+                      <div key={year} className="tick">
+                        <div className="tick-line" style={{ left: `${x}px` }} />
+                        <div className="tick-label" style={{ left: `${x}px` }}>
+                          {formatAxisYear(year)}
+                        </div>
+                      </div>
+                    )
+                  })
+                : null}
 
               {timelineRows.rows.map((row) => {
                 const selected = row.key === effectiveSelectedKey
@@ -916,6 +1042,16 @@ function App() {
                           openWiki(dynasty.name)
                         }}
                       />
+                      {displaySettings.showTrackEdgeYears ? (
+                        <>
+                          <div className="track-edge-label start dynasty" style={{ left: `${startX}px` }}>
+                            {formatAxisYear(dynasty.startYear)}
+                          </div>
+                          <div className="track-edge-label end dynasty" style={{ left: `${endX}px` }}>
+                            {formatAxisYear(dynasty.endYear)}
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   )
                 }
@@ -930,6 +1066,7 @@ function App() {
                 const reignStartX = hasReign ? getXByYear(ruler.reignStart) : 0
                 const reignEndX = hasReign ? getXByYear(ruler.reignEnd) : 0
                 const reignWidth = hasReign ? Math.max(8, reignEndX - reignStartX) : 0
+                const reignYears = hasReign ? calcSpanYears(ruler.reignStart, ruler.reignEnd, true) : null
                 const highlighted = row.key === highlightedRulerKey
 
                 return (
@@ -964,7 +1101,12 @@ function App() {
                       title="双击缩放并高亮该人物时间段"
                     >
                       <strong>{ruler.name}</strong>
-                      <span>{ruler.title}</span>
+                      <span className="ruler-meta-line">
+                        {ruler.title}
+                        {displaySettings.showRulerListLifeYears
+                          ? ` · ${formatCompactLifeYears(ruler.birthYear, ruler.deathYear, range.start, range.end)}`
+                          : ''}
+                      </span>
                     </div>
 
                     {hasLife ? (
@@ -1028,6 +1170,28 @@ function App() {
                           openWiki(ruler.name)
                         }}
                       />
+                    ) : null}
+
+                    {hasReign && displaySettings.showReignYears && reignYears !== null ? (
+                      <div
+                        className="reign-years-label"
+                        style={{
+                          left: `${clamp(reignStartX + reignWidth + 6, LABEL_WIDTH + 8, timelineWidth - 42)}px`
+                        }}
+                      >
+                        {reignYears}年
+                      </div>
+                    ) : null}
+
+                    {displaySettings.showTrackEdgeYears ? (
+                      <>
+                        <div className="track-edge-label start ruler" style={{ left: `${startX}px` }}>
+                          {formatAxisYear(range.start)}
+                        </div>
+                        <div className="track-edge-label end ruler" style={{ left: `${endX}px` }}>
+                          {formatAxisYear(range.end)}
+                        </div>
+                      </>
                     ) : null}
                   </div>
                 )
