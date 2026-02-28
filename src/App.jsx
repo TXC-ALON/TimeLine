@@ -734,6 +734,7 @@ function App() {
   const [subTimelineId, setSubTimelineId] = useState(null)
   const [highlightedRulerKey, setHighlightedRulerKey] = useState(null)
   const [displaySettings, setDisplaySettings] = useState(DEFAULT_DISPLAY_SETTINGS)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -760,8 +761,8 @@ function App() {
         normalizedSearch.length === 0
           ? rulersInWindow
           : rulersInWindow.filter((ruler) =>
-              matchFields([ruler.name, ruler.title, ruler.eraName, getEraSearchText(ruler, dynasty)], normalizedSearch)
-            )
+            matchFields([ruler.name, ruler.title, ruler.eraName, getEraSearchText(ruler, dynasty)], normalizedSearch)
+          )
 
       if (normalizedSearch.length > 0 && !dynastyMatched && matchedRulers.length === 0) {
         return result
@@ -958,10 +959,10 @@ function App() {
     setTooltip((current) =>
       current
         ? {
-            ...current,
-            x: event.clientX + 14,
-            y: event.clientY + 14
-          }
+          ...current,
+          x: event.clientX + 14,
+          y: event.clientY + 14
+        }
         : null
     )
   }
@@ -1122,6 +1123,19 @@ function App() {
     }
   }, [axisMinYear, zoom])
 
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return undefined
+    }
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsSettingsOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isSettingsOpen])
+
   return (
     <div className="app-shell">
       <header className="hero">
@@ -1143,63 +1157,73 @@ function App() {
           <button className="secondary-btn quick-btn" type="button" onClick={fitViewToCurrentRange}>
             适应视图缩放
           </button>
+          {isSubTimeline ? (
+            <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
+              退出子时间轴
+            </button>
+          ) : null}
+          <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
+            全部展开
+          </button>
+          <button className="secondary-btn" type="button" onClick={collapseAll}>
+            全部收起
+          </button>
+          <button className="secondary-btn quick-btn" type="button" onClick={() => setIsSettingsOpen(true)}>
+            Settings
+          </button>
         </div>
 
-        <details className="settings-menu">
-          <summary className="settings-summary">
-            <span>Settings</span>
-            <span className="settings-hint">搜索、过滤、显示开关</span>
-          </summary>
-          <div className="settings-body">
-            <div className="control-block">
-              <label htmlFor="search-input">搜索（朝代 / 君主 / 名号）</label>
-              <input
-                id="search-input"
-                type="text"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="例如：汉武帝、五代、康熙"
-              />
-            </div>
+        <div className="primary-controls">
+          <div className="control-block">
+            <label htmlFor="search-input">搜索（朝代 / 君主 / 名号）</label>
+            <input
+              id="search-input"
+              type="text"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="例如：汉武帝、五代、康熙"
+            />
+          </div>
 
-            <div className="control-block">
-              <label htmlFor="zoom-range">时间轴缩放（每年像素）: {zoom.toFixed(2)}</label>
-              <input
-                id="zoom-range"
-                type="range"
-                min={MIN_SCALE}
-                max={MAX_SCALE}
-                step={0.05}
-                value={zoom}
-                onChange={(event) => setZoom(Number(event.target.value))}
-              />
-            </div>
+          <div className="control-block">
+            <label htmlFor="zoom-range">时间轴缩放（每年像素）: {zoom.toFixed(2)}</label>
+            <input
+              id="zoom-range"
+              type="range"
+              min={MIN_SCALE}
+              max={MAX_SCALE}
+              step={0.05}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+            />
+          </div>
 
-            <div className="control-block">
-              <label htmlFor="window-start">时间段过滤</label>
-              <div className="range-labels">
-                <span>{formatYear(windowStart)}</span>
-                <span>{formatYear(windowEnd)}</span>
-              </div>
-              <input
-                id="window-start"
-                type="range"
-                min={TIMELINE_MIN_YEAR}
-                max={TIMELINE_MAX_YEAR}
-                value={windowStart}
-                onChange={(event) => handleWindowStartChange(event.target.value)}
-              />
-              <input
-                type="range"
-                min={TIMELINE_MIN_YEAR}
-                max={TIMELINE_MAX_YEAR}
-                value={windowEnd}
-                onChange={(event) => handleWindowEndChange(event.target.value)}
-              />
+          <div className="control-block">
+            <label htmlFor="window-start">时间段过滤</label>
+            <div className="range-labels">
+              <span>{formatYear(windowStart)}</span>
+              <span>{formatYear(windowEnd)}</span>
             </div>
+            <input
+              id="window-start"
+              type="range"
+              min={TIMELINE_MIN_YEAR}
+              max={TIMELINE_MAX_YEAR}
+              value={windowStart}
+              onChange={(event) => handleWindowStartChange(event.target.value)}
+            />
+            <input
+              type="range"
+              min={TIMELINE_MIN_YEAR}
+              max={TIMELINE_MAX_YEAR}
+              value={windowEnd}
+              onChange={(event) => handleWindowEndChange(event.target.value)}
+            />
+          </div>
 
-            <div className="control-block">
-              <label>时代分类过滤（至少保留一项）</label>
+          <div className="control-block wide">
+            <label>时代分类过滤（至少保留一项）</label>
+            <div className="dynasty-filter-row">
               <div className="dynasty-grid">
                 {categories.map((category) => {
                   const active = activeCategories.includes(category)
@@ -1216,10 +1240,32 @@ function App() {
                   )
                 })}
               </div>
+              <div className="button-row inline">
+                <button className="secondary-btn" type="button" onClick={resetFilters}>
+                  重置筛选
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="control-block">
-              <label>显示设置</label>
+      {isSettingsOpen ? (
+        <div className="settings-modal-backdrop" onClick={() => setIsSettingsOpen(false)}>
+          <div
+            className="settings-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="settings-modal-head">
+              <h2 id="settings-title">Settings</h2>
+              <button className="secondary-btn settings-close-btn" type="button" onClick={() => setIsSettingsOpen(false)}>
+                关闭
+              </button>
+            </div>
+            <div className="settings-modal-body">
               <div className="settings-groups">
                 {DISPLAY_SETTING_GROUPS.map((group) => (
                   <section key={group.title} className="settings-group">
@@ -1240,26 +1286,9 @@ function App() {
                 ))}
               </div>
             </div>
-
-            <div className="button-row">
-              <button className="secondary-btn" type="button" onClick={resetFilters}>
-                重置筛选
-              </button>
-              {isSubTimeline ? (
-                <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
-                  退出子时间轴
-                </button>
-              ) : null}
-              <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
-                展开当前结果
-              </button>
-              <button className="secondary-btn" type="button" onClick={collapseAll}>
-                收起全部
-              </button>
-            </div>
           </div>
-        </details>
-      </section>
+        </div>
+      ) : null}
 
       <section className="layout-grid">
         <article className="timeline-card">
@@ -1280,23 +1309,23 @@ function App() {
           >
             <div className="timeline-stage" style={{ width: `${timelineWidth}px`, height: `${timelineRows.height}px` }}>
               {periodBands.map((item) => {
-                  const startX = getXByYear(item.startYear)
-                  const endX = getXByYear(item.endYear)
-                  const width = Math.max(2, endX - startX)
-                  return (
-                    <div
-                      key={item.id}
-                      className="period-band"
-                      style={{
-                        left: `${startX}px`,
-                        width: `${width}px`,
-                        '--band-color': item.color
-                      }}
-                    >
-                      <span className="period-label">{item.label}</span>
-                    </div>
-                  )
-                })}
+                const startX = getXByYear(item.startYear)
+                const endX = getXByYear(item.endYear)
+                const width = Math.max(2, endX - startX)
+                return (
+                  <div
+                    key={item.id}
+                    className="period-band"
+                    style={{
+                      left: `${startX}px`,
+                      width: `${width}px`,
+                      '--band-color': item.color
+                    }}
+                  >
+                    <span className="period-label">{item.label}</span>
+                  </div>
+                )
+              })}
 
               <div className="axis-line" style={{ left: `${LABEL_WIDTH}px` }} />
 
@@ -1313,16 +1342,16 @@ function App() {
 
               {displaySettings.showTicks
                 ? yearTicks.map((year) => {
-                    const x = getXByYear(year)
-                    return (
-                      <div key={year} className="tick">
-                        <div className="tick-line" style={{ left: `${x}px` }} />
-                        <div className="tick-label" style={{ left: `${x}px` }}>
-                          {formatAxisYear(year)}
-                        </div>
+                  const x = getXByYear(year)
+                  return (
+                    <div key={year} className="tick">
+                      <div className="tick-line" style={{ left: `${x}px` }} />
+                      <div className="tick-label" style={{ left: `${x}px` }}>
+                        {formatAxisYear(year)}
                       </div>
-                    )
-                  })
+                    </div>
+                  )
+                })
                 : null}
 
               {timelineRows.rows.map((row) => {
@@ -1540,62 +1569,14 @@ function App() {
                     {displaySettings.showLifeTimeline
                       ? hasLife
                         ? (
-                            <div
-                              className="life-track"
-                              style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
-                              onMouseEnter={(event) =>
-                                showTooltip(event, `${ruler.name}（${ruler.title}）`, [
-                                  `所属：${dynasty.name}`,
-                                  ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                                  formatLifeText(ruler),
-                                  formatReignText(ruler, dynasty),
-                                  formatEraText(ruler, dynasty),
-                                  '点击可打开中文维基百科'
-                                ].filter(Boolean))
-                              }
-                              onMouseMove={moveTooltip}
-                              onMouseLeave={hideTooltip}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openWiki(ruler.name)
-                              }}
-                            />
-                          )
-                        : (
-                            <div
-                              className="life-track dashed"
-                              style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
-                              onMouseEnter={(event) =>
-                                showTooltip(event, `${ruler.name}（${ruler.title}）`, [
-                                  `所属：${dynasty.name}`,
-                                  ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                                  `区间：${formatPeriod(range.start, range.end)}`,
-                                  formatReignText(ruler, dynasty),
-                                  formatEraText(ruler, dynasty),
-                                  '点击可打开中文维基百科'
-                                ].filter(Boolean))
-                              }
-                              onMouseMove={moveTooltip}
-                              onMouseLeave={hideTooltip}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openWiki(ruler.name)
-                              }}
-                            />
-                          )
-                      : null}
-
-                    {hasReign && displaySettings.showReignTimeline
-                      ? reignSegments.map((period, index) => (
                           <div
-                            key={`${row.key}:reign:${index}`}
-                            className="reign-track"
-                            style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                            className="life-track"
+                            style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
                             onMouseEnter={(event) =>
-                              showTooltip(event, `${ruler.name}在位时间`, [
+                              showTooltip(event, `${ruler.name}（${ruler.title}）`, [
                                 `所属：${dynasty.name}`,
                                 ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                                `在位分段：${formatPeriod(period.start, period.end)}`,
+                                formatLifeText(ruler),
                                 formatReignText(ruler, dynasty),
                                 formatEraText(ruler, dynasty),
                                 '点击可打开中文维基百科'
@@ -1608,22 +1589,18 @@ function App() {
                               openWiki(ruler.name)
                             }}
                           />
-                        ))
-                      : null}
-
-                    {hasReign && displaySettings.showEraTimelineDetail
-                      ? eraSegments.map((period, index) => (
+                        )
+                        : (
                           <div
-                            key={`${row.key}:era:${index}`}
-                            className={`era-segment ${period.index % 2 === 0 ? 'even' : 'odd'}`}
-                            style={{ left: `${period.startX}px`, width: `${period.width}px` }}
-                            title={`${period.name} ${formatAxisYear(period.start)}-${formatAxisYear(period.end)}`}
+                            className="life-track dashed"
+                            style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
                             onMouseEnter={(event) =>
-                              showTooltip(event, `${ruler.name}年号`, [
+                              showTooltip(event, `${ruler.name}（${ruler.title}）`, [
                                 `所属：${dynasty.name}`,
                                 ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                                `年号：${period.name}`,
-                                `区间：${formatPeriod(period.start, period.end)}`,
+                                `区间：${formatPeriod(range.start, range.end)}`,
+                                formatReignText(ruler, dynasty),
+                                formatEraText(ruler, dynasty),
                                 '点击可打开中文维基百科'
                               ].filter(Boolean))
                             }
@@ -1633,12 +1610,64 @@ function App() {
                               event.stopPropagation()
                               openWiki(ruler.name)
                             }}
-                          >
-                            <span className="era-segment-text">
-                              {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}
-                            </span>
-                          </div>
-                        ))
+                          />
+                        )
+                      : null}
+
+                    {hasReign && displaySettings.showReignTimeline
+                      ? reignSegments.map((period, index) => (
+                        <div
+                          key={`${row.key}:reign:${index}`}
+                          className="reign-track"
+                          style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                          onMouseEnter={(event) =>
+                            showTooltip(event, `${ruler.name}在位时间`, [
+                              `所属：${dynasty.name}`,
+                              ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                              `在位分段：${formatPeriod(period.start, period.end)}`,
+                              formatReignText(ruler, dynasty),
+                              formatEraText(ruler, dynasty),
+                              '点击可打开中文维基百科'
+                            ].filter(Boolean))
+                          }
+                          onMouseMove={moveTooltip}
+                          onMouseLeave={hideTooltip}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openWiki(ruler.name)
+                          }}
+                        />
+                      ))
+                      : null}
+
+                    {hasReign && displaySettings.showEraTimelineDetail
+                      ? eraSegments.map((period, index) => (
+                        <div
+                          key={`${row.key}:era:${index}`}
+                          className={`era-segment ${period.index % 2 === 0 ? 'even' : 'odd'}`}
+                          style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                          title={`${period.name} ${formatAxisYear(period.start)}-${formatAxisYear(period.end)}`}
+                          onMouseEnter={(event) =>
+                            showTooltip(event, `${ruler.name}年号`, [
+                              `所属：${dynasty.name}`,
+                              ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                              `年号：${period.name}`,
+                              `区间：${formatPeriod(period.start, period.end)}`,
+                              '点击可打开中文维基百科'
+                            ].filter(Boolean))
+                          }
+                          onMouseMove={moveTooltip}
+                          onMouseLeave={hideTooltip}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openWiki(ruler.name)
+                          }}
+                        >
+                          <span className="era-segment-text">
+                            {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}
+                          </span>
+                        </div>
+                      ))
                       : null}
 
                     {hasReign && displaySettings.showReignTimeline && displaySettings.showReignYears && reignYears !== null ? (
@@ -1653,8 +1682,8 @@ function App() {
                     ) : null}
 
                     {displaySettings.showRulerTrackEdgeYears &&
-                    typeof rulerEdgeStartYear === 'number' &&
-                    typeof rulerEdgeEndYear === 'number' ? (
+                      typeof rulerEdgeStartYear === 'number' &&
+                      typeof rulerEdgeEndYear === 'number' ? (
                       <>
                         <div className="track-edge-label start ruler" style={{ left: `${rulerEdgeStartX}px` }}>
                           {formatAxisYear(rulerEdgeStartYear)}
