@@ -4,7 +4,8 @@ import { TIMELINE_MAX_YEAR, TIMELINE_MIN_YEAR, dynastyGroups } from './data/time
 const LABEL_WIDTH = 280
 const AXIS_HEIGHT = 72
 const DYNASTY_ROW_HEIGHT = 52
-const RULER_ROW_HEIGHT = 44
+const RULER_ROW_HEIGHT_COMPACT = 44
+const RULER_ROW_HEIGHT_ERA_DETAIL = 64
 const MIN_SCALE = 0.4
 const MAX_SCALE = 20
 const DEFAULT_SCALE = 0.85
@@ -66,6 +67,7 @@ const DEFAULT_DISPLAY_SETTINGS = {
   showTrackEdgeYears: true,
   showRulerListLifeYears: true,
   showReignYears: true,
+  showEraTimelineDetail: false,
   showTicks: true,
   showPeriodBands: true,
   showTooltips: true
@@ -76,6 +78,7 @@ const DISPLAY_SETTING_ITEMS = [
   { key: 'showTrackEdgeYears', label: '显示每行首尾年份' },
   { key: 'showRulerListLifeYears', label: '左侧显示君主生卒' },
   { key: 'showReignYears', label: '显示在位年数标记' },
+  { key: 'showEraTimelineDetail', label: '显示详细年号（自动加粗）' },
   { key: 'showTicks', label: '显示刻度线与年份' },
   { key: 'showPeriodBands', label: '显示分期背景色带' },
   { key: 'showTooltips', label: '显示悬浮详情提示' }
@@ -121,6 +124,65 @@ function calcSpanYears(start, end, inclusive = false) {
   return years
 }
 
+function getReignPeriods(ruler, _dynasty) {
+  if (Array.isArray(ruler.reignPeriods) && ruler.reignPeriods.length > 0) {
+    return ruler.reignPeriods
+      .filter((item) => typeof item?.start === 'number' && typeof item?.end === 'number')
+      .map((item) => ({
+        start: Math.min(item.start, item.end),
+        end: Math.max(item.start, item.end),
+        eraName: item.eraName
+      }))
+      .sort((a, b) => a.start - b.start)
+  }
+
+  if (typeof ruler.reignStart === 'number' && typeof ruler.reignEnd === 'number') {
+    return [
+      {
+        start: Math.min(ruler.reignStart, ruler.reignEnd),
+        end: Math.max(ruler.reignStart, ruler.reignEnd),
+        eraName: ruler.eraName
+      }
+    ]
+  }
+
+  return []
+}
+
+function getEraPeriods(ruler, reignPeriods) {
+  if (Array.isArray(ruler.eraPeriods) && ruler.eraPeriods.length > 0) {
+    return ruler.eraPeriods
+      .filter((item) => typeof item?.start === 'number' && typeof item?.end === 'number' && item?.name)
+      .map((item) => ({
+        name: item.name,
+        start: Math.min(item.start, item.end),
+        end: Math.max(item.start, item.end)
+      }))
+      .sort((a, b) => a.start - b.start)
+  }
+
+  return reignPeriods
+    .filter((item) => item.eraName)
+    .map((item) => ({
+      name: item.eraName,
+      start: item.start,
+      end: item.end
+    }))
+}
+
+function getReignTotalYears(reignPeriods) {
+  return reignPeriods.reduce((total, period) => total + (calcSpanYears(period.start, period.end, true) ?? 0), 0)
+}
+
+function getEraSearchText(ruler, dynasty) {
+  const reignPeriods = getReignPeriods(ruler, dynasty)
+  const eraPeriods = getEraPeriods(ruler, reignPeriods)
+  if (eraPeriods.length === 0) {
+    return ruler.eraName ?? ''
+  }
+  return eraPeriods.map((item) => item.name).join(' ')
+}
+
 function formatLifeText(ruler) {
   const lifeYears = calcSpanYears(ruler.birthYear, ruler.deathYear, false)
   if (lifeYears === null) {
@@ -129,12 +191,23 @@ function formatLifeText(ruler) {
   return `生卒：${formatPeriod(ruler.birthYear, ruler.deathYear)}（寿命约${lifeYears}年）`
 }
 
-function formatReignText(ruler) {
-  const reignYears = calcSpanYears(ruler.reignStart, ruler.reignEnd, true)
-  if (reignYears === null) {
+function formatReignText(ruler, dynasty) {
+  const reignPeriods = getReignPeriods(ruler, dynasty)
+  if (reignPeriods.length === 0) {
     return `在位：${formatPeriod(ruler.reignStart, ruler.reignEnd)}`
   }
-  return `在位：${formatPeriod(ruler.reignStart, ruler.reignEnd)}（约${reignYears}年）`
+  const reignText = reignPeriods.map((item) => formatPeriod(item.start, item.end)).join('、')
+  const reignYears = getReignTotalYears(reignPeriods)
+  return `在位：${reignText}（约${reignYears}年）`
+}
+
+function formatEraText(ruler, dynasty) {
+  const reignPeriods = getReignPeriods(ruler, dynasty)
+  const eraPeriods = getEraPeriods(ruler, reignPeriods)
+  if (eraPeriods.length === 0) {
+    return ruler.eraName ? `年号：${ruler.eraName}` : '年号：未知'
+  }
+  return `年号：${eraPeriods.map((item) => `${item.name}（${formatPeriod(item.start, item.end)}）`).join('、')}`
 }
 
 function buildWikiUrl(subject) {
@@ -278,8 +351,11 @@ function matchFields(fields, keyword) {
 }
 
 function getRulerRange(ruler, dynasty) {
-  let start = ruler.birthYear ?? ruler.reignStart ?? dynasty.startYear
-  let end = ruler.deathYear ?? ruler.reignEnd ?? dynasty.endYear
+  const reignPeriods = getReignPeriods(ruler, dynasty)
+  const firstReign = reignPeriods[0]
+  const lastReign = reignPeriods[reignPeriods.length - 1]
+  let start = ruler.birthYear ?? firstReign?.start ?? dynasty.startYear
+  let end = ruler.deathYear ?? lastReign?.end ?? dynasty.endYear
   if (start > end) {
     const temp = start
     start = end
@@ -391,7 +467,7 @@ function App() {
         normalizedSearch.length === 0
           ? rulersInWindow
           : rulersInWindow.filter((ruler) =>
-              matchFields([ruler.name, ruler.title, ruler.eraName], normalizedSearch)
+              matchFields([ruler.name, ruler.title, ruler.eraName, getEraSearchText(ruler, dynasty)], normalizedSearch)
             )
 
       if (normalizedSearch.length > 0 && !dynastyMatched && matchedRulers.length === 0) {
@@ -440,6 +516,7 @@ function App() {
   const timelineRows = useMemo(() => {
     const rows = []
     let top = AXIS_HEIGHT
+    const rulerRowHeight = displaySettings.showEraTimelineDetail ? RULER_ROW_HEIGHT_ERA_DETAIL : RULER_ROW_HEIGHT_COMPACT
 
     displayDynasties.forEach((dynasty) => {
       rows.push({
@@ -457,11 +534,11 @@ function App() {
             key: `ruler:${ruler.id}`,
             type: 'ruler',
             top,
-            height: RULER_ROW_HEIGHT,
+            height: rulerRowHeight,
             dynasty,
             ruler
           })
-          top += RULER_ROW_HEIGHT
+          top += rulerRowHeight
         })
       }
     })
@@ -470,7 +547,7 @@ function App() {
       rows,
       height: top + 24
     }
-  }, [displayDynasties, expandedDynasties, isSubTimeline])
+  }, [displayDynasties, displaySettings.showEraTimelineDetail, expandedDynasties, isSubTimeline])
 
   const rowMap = useMemo(() => {
     const map = new Map()
@@ -1062,17 +1139,37 @@ function App() {
                 const endX = getXByYear(range.end)
                 const intervalWidth = Math.max(10, endX - startX)
                 const hasLife = typeof ruler.birthYear === 'number' && typeof ruler.deathYear === 'number'
-                const hasReign = typeof ruler.reignStart === 'number' && typeof ruler.reignEnd === 'number'
-                const reignStartX = hasReign ? getXByYear(ruler.reignStart) : 0
-                const reignEndX = hasReign ? getXByYear(ruler.reignEnd) : 0
-                const reignWidth = hasReign ? Math.max(8, reignEndX - reignStartX) : 0
-                const reignYears = hasReign ? calcSpanYears(ruler.reignStart, ruler.reignEnd, true) : null
+                const reignPeriods = getReignPeriods(ruler, dynasty)
+                const eraPeriods = getEraPeriods(ruler, reignPeriods)
+                const hasReign = reignPeriods.length > 0
+                const reignSegments = reignPeriods.map((period) => {
+                  const segmentStartX = getXByYear(period.start)
+                  const segmentEndX = getXByYear(period.end)
+                  return {
+                    ...period,
+                    startX: segmentStartX,
+                    endX: segmentEndX,
+                    width: Math.max(8, segmentEndX - segmentStartX)
+                  }
+                })
+                const reignYears = hasReign ? getReignTotalYears(reignPeriods) : null
+                const maxReignEndX = hasReign ? Math.max(...reignSegments.map((item) => item.endX)) : 0
+                const eraSegments = eraPeriods.map((period) => {
+                  const segmentStartX = getXByYear(period.start)
+                  const segmentEndX = getXByYear(period.end)
+                  return {
+                    ...period,
+                    startX: segmentStartX,
+                    endX: segmentEndX,
+                    width: Math.max(16, segmentEndX - segmentStartX)
+                  }
+                })
                 const highlighted = row.key === highlightedRulerKey
 
                 return (
                   <div
                     key={row.key}
-                    className={`timeline-row ruler-row ${selected ? 'selected' : ''} ${highlighted ? 'highlighted' : ''}`}
+                    className={`timeline-row ruler-row ${selected ? 'selected' : ''} ${highlighted ? 'highlighted' : ''} ${displaySettings.showEraTimelineDetail ? 'era-detailed' : ''}`}
                     style={{
                       top: `${row.top}px`,
                       '--row-height': `${row.height}px`,
@@ -1118,7 +1215,8 @@ function App() {
                             `所属：${dynasty.name}`,
                             ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
                             formatLifeText(ruler),
-                            formatReignText(ruler),
+                            formatReignText(ruler, dynasty),
+                            formatEraText(ruler, dynasty),
                             '点击可打开中文维基百科'
                           ].filter(Boolean))
                         }
@@ -1138,7 +1236,8 @@ function App() {
                             `所属：${dynasty.name}`,
                             ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
                             `区间：${formatPeriod(range.start, range.end)}`,
-                            formatReignText(ruler),
+                            formatReignText(ruler, dynasty),
+                            formatEraText(ruler, dynasty),
                             '点击可打开中文维基百科'
                           ].filter(Boolean))
                         }
@@ -1151,32 +1250,51 @@ function App() {
                       />
                     )}
 
-                    {hasReign ? (
-                      <div
-                        className="reign-track"
-                        style={{ left: `${reignStartX}px`, width: `${reignWidth}px` }}
-                        onMouseEnter={(event) =>
-                          showTooltip(event, `${ruler.name}在位时间`, [
-                            `所属：${dynasty.name}`,
-                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                            formatReignText(ruler),
-                            '点击可打开中文维基百科'
-                          ].filter(Boolean))
-                        }
-                        onMouseMove={moveTooltip}
-                        onMouseLeave={hideTooltip}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openWiki(ruler.name)
-                        }}
-                      />
-                    ) : null}
+                    {hasReign
+                      ? reignSegments.map((period, index) => (
+                          <div
+                            key={`${row.key}:reign:${index}`}
+                            className="reign-track"
+                            style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                            onMouseEnter={(event) =>
+                              showTooltip(event, `${ruler.name}在位时间`, [
+                                `所属：${dynasty.name}`,
+                                ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                                `在位分段：${formatPeriod(period.start, period.end)}`,
+                                formatReignText(ruler, dynasty),
+                                formatEraText(ruler, dynasty),
+                                '点击可打开中文维基百科'
+                              ].filter(Boolean))
+                            }
+                            onMouseMove={moveTooltip}
+                            onMouseLeave={hideTooltip}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openWiki(ruler.name)
+                            }}
+                          />
+                        ))
+                      : null}
+
+                    {hasReign && displaySettings.showEraTimelineDetail
+                      ? eraSegments.map((period, index) => (
+                          <div
+                            key={`${row.key}:era:${index}`}
+                            className="era-segment"
+                            style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                          >
+                            <span className="era-segment-text">
+                              {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}
+                            </span>
+                          </div>
+                        ))
+                      : null}
 
                     {hasReign && displaySettings.showReignYears && reignYears !== null ? (
                       <div
                         className="reign-years-label"
                         style={{
-                          left: `${clamp(reignStartX + reignWidth + 6, LABEL_WIDTH + 8, timelineWidth - 42)}px`
+                          left: `${clamp(maxReignEndX + 6, LABEL_WIDTH + 8, timelineWidth - 42)}px`
                         }}
                       >
                         {reignYears}年
@@ -1232,9 +1350,9 @@ function App() {
                   <dt>死亡</dt>
                   <dd>{formatYear(selectedRow.ruler.deathYear)}</dd>
                   <dt>在位</dt>
-                  <dd>{formatPeriod(selectedRow.ruler.reignStart, selectedRow.ruler.reignEnd)}</dd>
+                  <dd>{formatReignText(selectedRow.ruler, selectedRow.dynasty).replace('在位：', '')}</dd>
                   <dt>年号</dt>
-                  <dd>{selectedRow.ruler.eraName || '未知'}</dd>
+                  <dd>{formatEraText(selectedRow.ruler, selectedRow.dynasty).replace('年号：', '')}</dd>
                 </dl>
               </>
             )
