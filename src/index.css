@@ -270,30 +270,50 @@ input[type='range'] {
   display: grid;
   align-content: center;
   background: linear-gradient(90deg, rgba(255, 250, 239, 0.95), rgba(255, 250, 239, 0.22));
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
 .name-slot.dynasty {
   grid-template-columns: auto 1fr;
   column-gap: 0.45rem;
+  cursor: default;
 }
 
 .dynasty-label {
   display: grid;
   align-content: center;
+  cursor: zoom-in;
 }
 
 .name-slot.ruler {
   margin-left: 22px;
   width: 222px;
+  cursor: zoom-in;
 }
 
-.caret {
+.fold-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #c6b08d;
+  background: #fff8ec;
   color: #594833;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.fold-btn:hover {
+  border-color: #9b6a43;
+  background: #fff2de;
+}
+
+.fold-btn:focus-visible {
+  outline: 2px solid rgba(143, 70, 52, 0.32);
+  outline-offset: 1px;
 }
 
 .name-slot strong {
