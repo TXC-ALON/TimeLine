@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Dynasty, convertYear } from 'cn-era'
 import { TIMELINE_MAX_YEAR, TIMELINE_MIN_YEAR, dynastyGroups } from './data/timelineData'
 
 const LABEL_WIDTH = 280
@@ -78,11 +79,126 @@ const DISPLAY_SETTING_ITEMS = [
   { key: 'showTrackEdgeYears', label: '显示每行首尾年份' },
   { key: 'showRulerListLifeYears', label: '左侧显示君主生卒' },
   { key: 'showReignYears', label: '显示在位年数标记' },
-  { key: 'showEraTimelineDetail', label: '显示详细年号（自动加粗）' },
+  { key: 'showEraTimelineDetail', label: '显示年号时间轴（并排，自动适配粗细）' },
   { key: 'showTicks', label: '显示刻度线与年份' },
   { key: 'showPeriodBands', label: '显示分期背景色带' },
   { key: 'showTooltips', label: '显示悬浮详情提示' }
 ]
+
+const ERA_DYNASTY_BY_GROUP_ID = {
+  'western-han': Dynasty.XI_HAN,
+  xin: Dynasty.XIN,
+  'eastern-han': Dynasty.DONG_HAN,
+  'cao-wei': Dynasty.SAN_GUO_WEI,
+  'shu-han': Dynasty.SAN_GUO_SHU,
+  'sun-wu': Dynasty.SAN_GUO_WU,
+  'western-jin': Dynasty.XI_JIN,
+  'eastern-jin': Dynasty.DONG_JIN,
+  'liu-song': Dynasty.LIU_SONG,
+  'southern-qi': Dynasty.NAN_QI,
+  liang: Dynasty.NAN_LIANG,
+  chen: Dynasty.CHEN,
+  'northern-wei': Dynasty.BEI_WEI,
+  'eastern-wei': Dynasty.DONG_WEI,
+  'western-wei': Dynasty.XI_WEI,
+  'northern-qi': Dynasty.BEI_QI,
+  'northern-zhou': Dynasty.BEI_ZHOU,
+  sui: Dynasty.SUI,
+  tang: Dynasty.TANG,
+  'wu-zhou': Dynasty.WU_ZHOU,
+  'later-liang': Dynasty.HOU_LIANG,
+  'later-tang': Dynasty.HOU_TANG,
+  'later-jin': Dynasty.HOU_JIN,
+  'later-han': Dynasty.HOU_HAN,
+  'later-zhou': Dynasty.HOU_ZHOU,
+  liao: Dynasty.LIAO,
+  'western-xia': Dynasty.XI_XIA,
+  'jin-dynasty': Dynasty.JIN_DYNASTY,
+  'northern-song': Dynasty.SONG,
+  'southern-song': Dynasty.SONG,
+  yuan: Dynasty.YUAN,
+  ming: Dynasty.MING,
+  qing: Dynasty.QING
+}
+
+const ERA_DYNASTY_BY_NAME = {
+  西汉: Dynasty.XI_HAN,
+  西漢: Dynasty.XI_HAN,
+  新: Dynasty.XIN,
+  东汉: Dynasty.DONG_HAN,
+  東漢: Dynasty.DONG_HAN,
+  曹魏: Dynasty.SAN_GUO_WEI,
+  蜀汉: Dynasty.SAN_GUO_SHU,
+  蜀漢: Dynasty.SAN_GUO_SHU,
+  孙吴: Dynasty.SAN_GUO_WU,
+  孫吳: Dynasty.SAN_GUO_WU,
+  西晋: Dynasty.XI_JIN,
+  西晉: Dynasty.XI_JIN,
+  东晋: Dynasty.DONG_JIN,
+  東晉: Dynasty.DONG_JIN,
+  刘宋: Dynasty.LIU_SONG,
+  劉宋: Dynasty.LIU_SONG,
+  南齐: Dynasty.NAN_QI,
+  南齊: Dynasty.NAN_QI,
+  梁: Dynasty.NAN_LIANG,
+  陈: Dynasty.CHEN,
+  陳: Dynasty.CHEN,
+  北魏: Dynasty.BEI_WEI,
+  东魏: Dynasty.DONG_WEI,
+  東魏: Dynasty.DONG_WEI,
+  西魏: Dynasty.XI_WEI,
+  北齐: Dynasty.BEI_QI,
+  北齊: Dynasty.BEI_QI,
+  北周: Dynasty.BEI_ZHOU,
+  隋: Dynasty.SUI,
+  唐: Dynasty.TANG,
+  武周: Dynasty.WU_ZHOU,
+  后梁: Dynasty.HOU_LIANG,
+  後梁: Dynasty.HOU_LIANG,
+  后唐: Dynasty.HOU_TANG,
+  後唐: Dynasty.HOU_TANG,
+  后晋: Dynasty.HOU_JIN,
+  後晉: Dynasty.HOU_JIN,
+  后汉: Dynasty.HOU_HAN,
+  後漢: Dynasty.HOU_HAN,
+  后周: Dynasty.HOU_ZHOU,
+  後周: Dynasty.HOU_ZHOU,
+  宋: Dynasty.SONG,
+  北宋: Dynasty.SONG,
+  南宋: Dynasty.SONG,
+  辽: Dynasty.LIAO,
+  遼: Dynasty.LIAO,
+  西夏: Dynasty.XI_XIA,
+  金: Dynasty.JIN_DYNASTY,
+  元: Dynasty.YUAN,
+  明: Dynasty.MING,
+  清: Dynasty.QING
+}
+
+const ERA_YEAR_CACHE = new Map()
+const ERA_RANGE_CACHE = new Map()
+const MANUAL_ERA_PERIODS_BY_RULER_ID = {
+  'sw-jingdi': [{ name: '永安', start: 258, end: 264 }],
+  'sw-modi': [
+    { name: '元兴', start: 264, end: 264 },
+    { name: '甘露', start: 265, end: 266 },
+    { name: '宝鼎', start: 266, end: 269 },
+    { name: '建衡', start: 269, end: 271 },
+    { name: '凤凰', start: 272, end: 274 },
+    { name: '天册', start: 275, end: 276 },
+    { name: '天玺', start: 276, end: 277 },
+    { name: '天纪', start: 277, end: 280 }
+  ],
+  'ww-feidi': [{ name: '大统', start: 552, end: 554 }],
+  'ww-gongdi': [{ name: '廓定', start: 554, end: 557 }],
+  'nz-xiaomin': [{ name: '无年号', start: 557, end: 557 }],
+  'jin-aizong': [
+    { name: '正大', start: 1224, end: 1232 },
+    { name: '开兴', start: 1232, end: 1232 },
+    { name: '天兴', start: 1232, end: 1234 }
+  ],
+  'jin-modi': [{ name: '盛昌', start: 1234, end: 1234 }]
+}
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
@@ -124,7 +240,7 @@ function calcSpanYears(start, end, inclusive = false) {
   return years
 }
 
-function getReignPeriods(ruler, _dynasty) {
+function getReignPeriods(ruler) {
   if (Array.isArray(ruler.reignPeriods) && ruler.reignPeriods.length > 0) {
     return ruler.reignPeriods
       .filter((item) => typeof item?.start === 'number' && typeof item?.end === 'number')
@@ -149,9 +265,122 @@ function getReignPeriods(ruler, _dynasty) {
   return []
 }
 
-function getEraPeriods(ruler, reignPeriods) {
-  if (Array.isArray(ruler.eraPeriods) && ruler.eraPeriods.length > 0) {
-    return ruler.eraPeriods
+function normalizeNameKey(value) {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  return value.replace(/（.*?）/g, '').trim()
+}
+
+function getEraDynastyEnum(ruler, dynasty) {
+  const fromId = dynasty?.id ? ERA_DYNASTY_BY_GROUP_ID[dynasty.id] : undefined
+  if (typeof fromId === 'number') {
+    return fromId
+  }
+  const candidates = [ruler?.sourcePolity, dynasty?.name]
+  for (const candidate of candidates) {
+    const key = normalizeNameKey(candidate)
+    const mapped = ERA_DYNASTY_BY_NAME[key]
+    if (typeof mapped === 'number') {
+      return mapped
+    }
+  }
+  return null
+}
+
+function getEraTitlesByYear(year, dynastyEnum) {
+  if (year === 0) {
+    return []
+  }
+  const cacheKey = `${dynastyEnum}:${year}`
+  if (ERA_YEAR_CACHE.has(cacheKey)) {
+    return ERA_YEAR_CACHE.get(cacheKey)
+  }
+  let titles = []
+  try {
+    const items = convertYear(year, { mode: 'all', dynasty: dynastyEnum })
+    const dedup = new Set(items.map((item) => item.reign_title).filter(Boolean))
+    titles = [...dedup]
+  } catch {
+    titles = []
+  }
+  ERA_YEAR_CACHE.set(cacheKey, titles)
+  return titles
+}
+
+function buildAutoEraPeriods(reignPeriods, dynastyEnum) {
+  if (reignPeriods.length === 0 || typeof dynastyEnum !== 'number') {
+    return []
+  }
+  const cacheKey = `${dynastyEnum}:${reignPeriods.map((item) => `${item.start}-${item.end}`).join('|')}`
+  if (ERA_RANGE_CACHE.has(cacheKey)) {
+    return ERA_RANGE_CACHE.get(cacheKey)
+  }
+
+  const segments = []
+
+  reignPeriods.forEach((period) => {
+    const start = Math.min(period.start, period.end)
+    const end = Math.max(period.start, period.end)
+    if (start > end) {
+      return
+    }
+
+    for (let year = start; year <= end; year += 1) {
+      if (year === 0) {
+        continue
+      }
+      let titles = getEraTitlesByYear(year, dynastyEnum)
+      if (titles.length === 0) {
+        continue
+      }
+
+      if (titles.length > 1 && start < end) {
+        if (year === start) {
+          const nextYear = year + 1 === 0 ? year + 2 : year + 1
+          if (nextYear <= end) {
+            const nextTitles = new Set(getEraTitlesByYear(nextYear, dynastyEnum))
+            const continued = titles.filter((title) => nextTitles.has(title))
+            if (continued.length > 0) {
+              titles = continued
+            }
+          }
+        } else if (year === end) {
+          const prevYear = year - 1 === 0 ? year - 2 : year - 1
+          if (prevYear >= start) {
+            const prevTitles = new Set(getEraTitlesByYear(prevYear, dynastyEnum))
+            const continued = titles.filter((title) => prevTitles.has(title))
+            if (continued.length > 0) {
+              titles = continued
+            }
+          }
+        }
+      }
+
+      titles.forEach((title) => {
+        const last = segments[segments.length - 1]
+        if (last && last.name === title && last.end === year - 1) {
+          last.end = year
+          return
+        }
+        segments.push({
+          name: title,
+          start: year,
+          end: year
+        })
+      })
+    }
+  })
+
+  segments.sort((a, b) => a.start - b.start || a.end - b.end || a.name.localeCompare(b.name))
+  ERA_RANGE_CACHE.set(cacheKey, segments)
+  return segments
+}
+
+function getEraPeriods(ruler, reignPeriods, dynasty) {
+  const manual = MANUAL_ERA_PERIODS_BY_RULER_ID[ruler.id]
+  if (Array.isArray(manual) && manual.length > 0) {
+    return manual
       .filter((item) => typeof item?.start === 'number' && typeof item?.end === 'number' && item?.name)
       .map((item) => ({
         name: item.name,
@@ -161,13 +390,56 @@ function getEraPeriods(ruler, reignPeriods) {
       .sort((a, b) => a.start - b.start)
   }
 
-  return reignPeriods
+  if (Array.isArray(ruler.eraPeriods) && ruler.eraPeriods.length > 0) {
+    return ruler.eraPeriods
+      .filter((item) => typeof item?.start === 'number' && typeof item?.end === 'number' && (item?.name || item?.eraName))
+      .map((item) => ({
+        name: item.name ?? item.eraName,
+        start: Math.min(item.start, item.end),
+        end: Math.max(item.start, item.end)
+      }))
+      .sort((a, b) => a.start - b.start)
+  }
+
+  const withEraName = reignPeriods
     .filter((item) => item.eraName)
     .map((item) => ({
       name: item.eraName,
       start: item.start,
       end: item.end
     }))
+
+  const shouldExpandByAuto =
+    withEraName.length === 0 || withEraName.some((item) => /[、，,]|等/.test(item.name))
+
+  if (!shouldExpandByAuto && withEraName.length > 0) {
+    return withEraName
+  }
+
+  const dynastyEnum = getEraDynastyEnum(ruler, dynasty)
+  if (shouldExpandByAuto) {
+    const autoPeriods = buildAutoEraPeriods(reignPeriods, dynastyEnum)
+    if (autoPeriods.length > 0) {
+      return autoPeriods
+    }
+  }
+
+  if (withEraName.length > 0) {
+    return withEraName
+  }
+
+  if (reignPeriods.length === 0) {
+    return []
+  }
+
+  const latestEnd = reignPeriods[reignPeriods.length - 1].end
+  const placeholder = latestEnd < -140 ? '无年号' : '未录入年号'
+
+  return reignPeriods.map((item) => ({
+    name: placeholder,
+    start: item.start,
+    end: item.end
+  }))
 }
 
 function getReignTotalYears(reignPeriods) {
@@ -176,7 +448,7 @@ function getReignTotalYears(reignPeriods) {
 
 function getEraSearchText(ruler, dynasty) {
   const reignPeriods = getReignPeriods(ruler, dynasty)
-  const eraPeriods = getEraPeriods(ruler, reignPeriods)
+  const eraPeriods = getEraPeriods(ruler, reignPeriods, dynasty)
   if (eraPeriods.length === 0) {
     return ruler.eraName ?? ''
   }
@@ -203,7 +475,7 @@ function formatReignText(ruler, dynasty) {
 
 function formatEraText(ruler, dynasty) {
   const reignPeriods = getReignPeriods(ruler, dynasty)
-  const eraPeriods = getEraPeriods(ruler, reignPeriods)
+  const eraPeriods = getEraPeriods(ruler, reignPeriods, dynasty)
   if (eraPeriods.length === 0) {
     return ruler.eraName ? `年号：${ruler.eraName}` : '年号：未知'
   }
@@ -677,12 +949,6 @@ function App() {
     setTooltip(null)
   }
 
-  useEffect(() => {
-    if (!displaySettings.showTooltips) {
-      setTooltip(null)
-    }
-  }, [displaySettings.showTooltips])
-
   const handleWindowStartChange = (value) => {
     const nextStart = Number(value)
     setYearWindow(([, end]) => [Math.min(nextStart, end), end])
@@ -717,6 +983,9 @@ function App() {
   }
 
   const toggleDisplaySetting = (settingKey) => {
+    if (settingKey === 'showTooltips' && displaySettings.showTooltips) {
+      setTooltip(null)
+    }
     setDisplaySettings((current) => ({
       ...current,
       [settingKey]: !current[settingKey]
@@ -1140,7 +1409,7 @@ function App() {
                 const intervalWidth = Math.max(10, endX - startX)
                 const hasLife = typeof ruler.birthYear === 'number' && typeof ruler.deathYear === 'number'
                 const reignPeriods = getReignPeriods(ruler, dynasty)
-                const eraPeriods = getEraPeriods(ruler, reignPeriods)
+                const eraPeriods = getEraPeriods(ruler, reignPeriods, dynasty)
                 const hasReign = reignPeriods.length > 0
                 const reignSegments = reignPeriods.map((period) => {
                   const segmentStartX = getXByYear(period.start)
@@ -1154,14 +1423,34 @@ function App() {
                 })
                 const reignYears = hasReign ? getReignTotalYears(reignPeriods) : null
                 const maxReignEndX = hasReign ? Math.max(...reignSegments.map((item) => item.endX)) : 0
-                const eraSegments = eraPeriods.map((period) => {
-                  const segmentStartX = getXByYear(period.start)
-                  const segmentEndX = getXByYear(period.end)
+                const reignBoundStart = hasReign ? Math.min(...reignPeriods.map((item) => item.start)) : range.start
+                const reignBoundEnd = hasReign ? Math.max(...reignPeriods.map((item) => item.end)) : range.end
+                const reignBoundStartX = getXByYear(reignBoundStart)
+                const reignBoundEndX = getXByYear(reignBoundEnd)
+                const eraSegments = eraPeriods.map((period, index) => {
+                  const next = eraPeriods[index + 1] ?? null
+                  const clampedStartYear = clamp(period.start, reignBoundStart, reignBoundEnd)
+                  const clampedEndYear = clamp(period.end, reignBoundStart, reignBoundEnd)
+                  const segmentStartYear = Math.min(clampedStartYear, clampedEndYear)
+                  const segmentEndYear = Math.max(clampedStartYear, clampedEndYear)
+                  const rawStartX = getXByYear(segmentStartYear)
+                  const shouldSnapToNext = next && next.start === period.end + 1
+                  const rawEndX = shouldSnapToNext
+                    ? getXByYear(clamp(next.start, reignBoundStart, reignBoundEnd))
+                    : getXByYear(segmentEndYear)
+                  const boundedStartX = clamp(rawStartX, reignBoundStartX, reignBoundEndX)
+                  const boundedEndX = clamp(rawEndX, reignBoundStartX, reignBoundEndX)
+                  const safeStartX = Math.min(boundedStartX, boundedEndX)
+                  const safeEndX = Math.max(boundedStartX, boundedEndX)
+                  const spanX = Math.max(0, reignBoundEndX - reignBoundStartX)
+                  const width = spanX > 0 ? Math.min(Math.max(2, safeEndX - safeStartX), spanX) : 0
+                  const startX = width > 0 ? clamp(safeStartX, reignBoundStartX, reignBoundEndX - width) : safeStartX
                   return {
                     ...period,
-                    startX: segmentStartX,
-                    endX: segmentEndX,
-                    width: Math.max(16, segmentEndX - segmentStartX)
+                    startX,
+                    endX: startX + width,
+                    width,
+                    index
                   }
                 })
                 const highlighted = row.key === highlightedRulerKey
@@ -1280,8 +1569,24 @@ function App() {
                       ? eraSegments.map((period, index) => (
                           <div
                             key={`${row.key}:era:${index}`}
-                            className="era-segment"
+                            className={`era-segment ${period.index % 2 === 0 ? 'even' : 'odd'}`}
                             style={{ left: `${period.startX}px`, width: `${period.width}px` }}
+                            title={`${period.name} ${formatAxisYear(period.start)}-${formatAxisYear(period.end)}`}
+                            onMouseEnter={(event) =>
+                              showTooltip(event, `${ruler.name}年号`, [
+                                `所属：${dynasty.name}`,
+                                ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                                `年号：${period.name}`,
+                                `区间：${formatPeriod(period.start, period.end)}`,
+                                '点击可打开中文维基百科'
+                              ].filter(Boolean))
+                            }
+                            onMouseMove={moveTooltip}
+                            onMouseLeave={hideTooltip}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openWiki(ruler.name)
+                            }}
                           >
                             <span className="era-segment-text">
                               {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}

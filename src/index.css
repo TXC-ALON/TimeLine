@@ -537,7 +537,7 @@ input[type='range'] {
   top: 13px;
   z-index: 3;
   height: 14px;
-  border-radius: 7px;
+  border-radius: 0;
   border: 1px solid rgba(112, 80, 52, 0.25);
   background: rgba(255, 248, 234, 0.95);
   color: #5b4530;
@@ -547,7 +547,16 @@ input[type='range'] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.era-segment.even {
+  background: rgba(255, 248, 234, 0.95);
+}
+
+.era-segment.odd {
+  background: rgba(247, 238, 221, 0.96);
 }
 
 .era-segment-text {

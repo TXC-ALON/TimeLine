@@ -220,20 +220,135 @@ export const dynastyGroups = [
     startYear: -202,
     endYear: 8,
     rulers: [
-      { id: 'wh-gaozu', name: '汉高祖', title: '刘邦', birthYear: -256, deathYear: -195, reignStart: -202, reignEnd: -195 },
-      { id: 'wh-huidi', name: '汉惠帝', title: '刘盈', birthYear: -210, deathYear: -188, reignStart: -195, reignEnd: -188 },
-      { id: 'wh-qianshaodi', name: '汉前少帝', title: '刘恭', reignStart: -188, reignEnd: -184 },
-      { id: 'wh-houshaodi', name: '汉后少帝', title: '刘弘', reignStart: -184, reignEnd: -180 },
-      { id: 'wh-wendi', name: '汉文帝', title: '刘恒', birthYear: -203, deathYear: -157, reignStart: -180, reignEnd: -157 },
-      { id: 'wh-jingdi', name: '汉景帝', title: '刘启', birthYear: -188, deathYear: -141, reignStart: -157, reignEnd: -141 },
-      { id: 'wh-wudi', name: '汉武帝', title: '刘彻', birthYear: -156, deathYear: -87, reignStart: -141, reignEnd: -87 },
-      { id: 'wh-zhaodi', name: '汉昭帝', title: '刘弗陵', birthYear: -94, deathYear: -74, reignStart: -87, reignEnd: -74 },
-      { id: 'wh-xuandi', name: '汉宣帝', title: '刘询', birthYear: -91, deathYear: -48, reignStart: -74, reignEnd: -48 },
-      { id: 'wh-yuandi', name: '汉元帝', title: '刘奭', birthYear: -74, deathYear: -33, reignStart: -48, reignEnd: -33 },
-      { id: 'wh-chengdi', name: '汉成帝', title: '刘骜', birthYear: -51, deathYear: -7, reignStart: -33, reignEnd: -7 },
-      { id: 'wh-aidi', name: '汉哀帝', title: '刘欣', birthYear: -27, deathYear: 1, reignStart: -7, reignEnd: 1 },
-      { id: 'wh-pingdi', name: '汉平帝', title: '刘衎', birthYear: -9, deathYear: 6, reignStart: 1, reignEnd: 6 },
-      { id: 'wh-ruziying', name: '孺子婴', title: '刘婴', birthYear: 5, deathYear: 25, reignStart: 6, reignEnd: 9 }
+      { id: 'wh-gaozu', name: '汉高祖', title: '刘邦', birthYear: -256, deathYear: -195, reignStart: -202, reignEnd: -195, eraName: '无年号' },
+      { id: 'wh-huidi', name: '汉惠帝', title: '刘盈', birthYear: -210, deathYear: -188, reignStart: -195, reignEnd: -188, eraName: '无年号' },
+      { id: 'wh-qianshaodi', name: '汉前少帝', title: '刘恭', reignStart: -188, reignEnd: -184, eraName: '无年号' },
+      { id: 'wh-houshaodi', name: '汉后少帝', title: '刘弘', reignStart: -184, reignEnd: -180, eraName: '无年号' },
+      { id: 'wh-wendi', name: '汉文帝', title: '刘恒', birthYear: -203, deathYear: -157, reignStart: -180, reignEnd: -157, eraName: '无年号' },
+      { id: 'wh-jingdi', name: '汉景帝', title: '刘启', birthYear: -188, deathYear: -141, reignStart: -157, reignEnd: -141, eraName: '无年号' },
+      {
+        id: 'wh-wudi',
+        name: '汉武帝',
+        title: '刘彻',
+        birthYear: -156,
+        deathYear: -87,
+        reignStart: -141,
+        reignEnd: -87,
+        eraPeriods: [
+          { name: '建元', start: -140, end: -135 },
+          { name: '元光', start: -134, end: -129 },
+          { name: '元朔', start: -128, end: -123 },
+          { name: '元狩', start: -122, end: -117 },
+          { name: '元鼎', start: -116, end: -111 },
+          { name: '元封', start: -110, end: -105 },
+          { name: '太初', start: -104, end: -101 },
+          { name: '天汉', start: -100, end: -97 },
+          { name: '太始', start: -96, end: -93 },
+          { name: '征和', start: -92, end: -89 },
+          { name: '后元', start: -88, end: -87 }
+        ]
+      },
+      {
+        id: 'wh-zhaodi',
+        name: '汉昭帝',
+        title: '刘弗陵',
+        birthYear: -94,
+        deathYear: -74,
+        reignStart: -87,
+        reignEnd: -74,
+        eraPeriods: [
+          { name: '始元', start: -86, end: -80 },
+          { name: '元凤', start: -80, end: -75 },
+          { name: '元平', start: -74, end: -74 }
+        ]
+      },
+      {
+        id: 'wh-xuandi',
+        name: '汉宣帝',
+        title: '刘询',
+        birthYear: -91,
+        deathYear: -48,
+        reignStart: -74,
+        reignEnd: -48,
+        eraPeriods: [
+          { name: '本始', start: -73, end: -70 },
+          { name: '地节', start: -69, end: -66 },
+          { name: '元康', start: -65, end: -61 },
+          { name: '神爵', start: -60, end: -58 },
+          { name: '五凤', start: -57, end: -54 },
+          { name: '甘露', start: -53, end: -50 },
+          { name: '黄龙', start: -49, end: -48 }
+        ]
+      },
+      {
+        id: 'wh-yuandi',
+        name: '汉元帝',
+        title: '刘奭',
+        birthYear: -74,
+        deathYear: -33,
+        reignStart: -48,
+        reignEnd: -33,
+        eraPeriods: [
+          { name: '初元', start: -48, end: -44 },
+          { name: '永光', start: -43, end: -39 },
+          { name: '建昭', start: -38, end: -34 },
+          { name: '竟宁', start: -33, end: -33 }
+        ]
+      },
+      {
+        id: 'wh-chengdi',
+        name: '汉成帝',
+        title: '刘骜',
+        birthYear: -51,
+        deathYear: -7,
+        reignStart: -33,
+        reignEnd: -7,
+        eraPeriods: [
+          { name: '建始', start: -32, end: -29 },
+          { name: '河平', start: -28, end: -25 },
+          { name: '阳朔', start: -24, end: -21 },
+          { name: '鸿嘉', start: -20, end: -17 },
+          { name: '永始', start: -16, end: -13 },
+          { name: '元延', start: -12, end: -9 },
+          { name: '绥和', start: -8, end: -7 }
+        ]
+      },
+      {
+        id: 'wh-aidi',
+        name: '汉哀帝',
+        title: '刘欣',
+        birthYear: -27,
+        deathYear: 1,
+        reignStart: -7,
+        reignEnd: 1,
+        eraPeriods: [
+          { name: '建平', start: -6, end: -3 },
+          { name: '元寿', start: -2, end: 1 }
+        ]
+      },
+      {
+        id: 'wh-pingdi',
+        name: '汉平帝',
+        title: '刘衎',
+        birthYear: -9,
+        deathYear: 6,
+        reignStart: 1,
+        reignEnd: 6,
+        eraName: '元始'
+      },
+      {
+        id: 'wh-ruziying',
+        name: '孺子婴',
+        title: '刘婴',
+        birthYear: 5,
+        deathYear: 25,
+        reignStart: 6,
+        reignEnd: 9,
+        eraPeriods: [
+          { name: '居摄', start: 6, end: 8 },
+          { name: '初始', start: 8, end: 9 }
+        ]
+      }
     ]
   },
   {
@@ -242,7 +357,22 @@ export const dynastyGroups = [
     category: '秦汉三国',
     startYear: 9,
     endYear: 23,
-    rulers: [{ id: 'xin-wangmang', name: '新始建国皇帝', title: '王莽', birthYear: -45, deathYear: 23, reignStart: 9, reignEnd: 23 }]
+    rulers: [
+      {
+        id: 'xin-wangmang',
+        name: '新始建国皇帝',
+        title: '王莽',
+        birthYear: -45,
+        deathYear: 23,
+        reignStart: 9,
+        reignEnd: 23,
+        eraPeriods: [
+          { name: '始建国', start: 9, end: 13 },
+          { name: '天凤', start: 14, end: 19 },
+          { name: '地皇', start: 20, end: 23 }
+        ]
+      }
+    ]
   },
   {
     id: 'eastern-han',
@@ -251,20 +381,145 @@ export const dynastyGroups = [
     startYear: 25,
     endYear: 220,
     rulers: [
-      { id: 'eh-guangwu', name: '汉光武帝', title: '刘秀', birthYear: -5, deathYear: 57, reignStart: 25, reignEnd: 57 },
-      { id: 'eh-mingdi', name: '汉明帝', title: '刘庄', birthYear: 28, deathYear: 75, reignStart: 57, reignEnd: 75 },
-      { id: 'eh-zhangdi', name: '汉章帝', title: '刘炟', birthYear: 57, deathYear: 88, reignStart: 75, reignEnd: 88 },
-      { id: 'eh-hedi', name: '汉和帝', title: '刘肇', birthYear: 79, deathYear: 106, reignStart: 88, reignEnd: 106 },
-      { id: 'eh-shangdi', name: '汉殇帝', title: '刘隆', birthYear: 105, deathYear: 106, reignStart: 106, reignEnd: 106 },
-      { id: 'eh-andi', name: '汉安帝', title: '刘祜', birthYear: 94, deathYear: 125, reignStart: 106, reignEnd: 125 },
-      { id: 'eh-beixianghou', name: '汉少帝', title: '刘懿（北乡侯）', reignStart: 125, reignEnd: 125 },
-      { id: 'eh-shundi', name: '汉顺帝', title: '刘保', birthYear: 115, deathYear: 144, reignStart: 125, reignEnd: 144 },
-      { id: 'eh-chongdi', name: '汉冲帝', title: '刘炳', birthYear: 143, deathYear: 145, reignStart: 144, reignEnd: 145 },
-      { id: 'eh-zhidi', name: '汉质帝', title: '刘缵', birthYear: 138, deathYear: 146, reignStart: 145, reignEnd: 146 },
-      { id: 'eh-huandi', name: '汉桓帝', title: '刘志', birthYear: 132, deathYear: 167, reignStart: 146, reignEnd: 167 },
-      { id: 'eh-lingdi', name: '汉灵帝', title: '刘宏', birthYear: 156, deathYear: 189, reignStart: 168, reignEnd: 189 },
-      { id: 'eh-shaodi', name: '汉少帝', title: '刘辩（弘农王）', birthYear: 176, deathYear: 190, reignStart: 189, reignEnd: 189 },
-      { id: 'eh-xiandi', name: '汉献帝', title: '刘协', birthYear: 181, deathYear: 234, reignStart: 189, reignEnd: 220 }
+      {
+        id: 'eh-guangwu',
+        name: '汉光武帝',
+        title: '刘秀',
+        birthYear: -5,
+        deathYear: 57,
+        reignStart: 25,
+        reignEnd: 57,
+        eraPeriods: [
+          { name: '建武', start: 25, end: 56 },
+          { name: '建武中元', start: 56, end: 57 }
+        ]
+      },
+      { id: 'eh-mingdi', name: '汉明帝', title: '刘庄', birthYear: 28, deathYear: 75, reignStart: 57, reignEnd: 75, eraName: '永平' },
+      {
+        id: 'eh-zhangdi',
+        name: '汉章帝',
+        title: '刘炟',
+        birthYear: 57,
+        deathYear: 88,
+        reignStart: 75,
+        reignEnd: 88,
+        eraPeriods: [
+          { name: '建初', start: 76, end: 84 },
+          { name: '元和', start: 84, end: 87 },
+          { name: '章和', start: 87, end: 88 }
+        ]
+      },
+      {
+        id: 'eh-hedi',
+        name: '汉和帝',
+        title: '刘肇',
+        birthYear: 79,
+        deathYear: 106,
+        reignStart: 88,
+        reignEnd: 106,
+        eraPeriods: [
+          { name: '永元', start: 89, end: 105 },
+          { name: '元兴', start: 105, end: 106 }
+        ]
+      },
+      { id: 'eh-shangdi', name: '汉殇帝', title: '刘隆', birthYear: 105, deathYear: 106, reignStart: 106, reignEnd: 106, eraName: '延平' },
+      {
+        id: 'eh-andi',
+        name: '汉安帝',
+        title: '刘祜',
+        birthYear: 94,
+        deathYear: 125,
+        reignStart: 106,
+        reignEnd: 125,
+        eraPeriods: [
+          { name: '永初', start: 107, end: 113 },
+          { name: '元初', start: 114, end: 119 },
+          { name: '永宁', start: 120, end: 121 },
+          { name: '建光', start: 121, end: 122 },
+          { name: '延光', start: 122, end: 125 }
+        ]
+      },
+      { id: 'eh-beixianghou', name: '汉少帝', title: '刘懿（北乡侯）', reignStart: 125, reignEnd: 125, eraName: '延光' },
+      {
+        id: 'eh-shundi',
+        name: '汉顺帝',
+        title: '刘保',
+        birthYear: 115,
+        deathYear: 144,
+        reignStart: 125,
+        reignEnd: 144,
+        eraPeriods: [
+          { name: '永建', start: 126, end: 132 },
+          { name: '阳嘉', start: 132, end: 135 },
+          { name: '永和', start: 136, end: 141 },
+          { name: '汉安', start: 142, end: 144 },
+          { name: '建康', start: 144, end: 144 }
+        ]
+      },
+      { id: 'eh-chongdi', name: '汉冲帝', title: '刘炳', birthYear: 143, deathYear: 145, reignStart: 144, reignEnd: 145, eraName: '永嘉' },
+      { id: 'eh-zhidi', name: '汉质帝', title: '刘缵', birthYear: 138, deathYear: 146, reignStart: 145, reignEnd: 146, eraName: '本初' },
+      {
+        id: 'eh-huandi',
+        name: '汉桓帝',
+        title: '刘志',
+        birthYear: 132,
+        deathYear: 167,
+        reignStart: 146,
+        reignEnd: 167,
+        eraPeriods: [
+          { name: '建和', start: 147, end: 149 },
+          { name: '和平', start: 150, end: 150 },
+          { name: '元嘉', start: 151, end: 153 },
+          { name: '永兴', start: 153, end: 154 },
+          { name: '永寿', start: 155, end: 158 },
+          { name: '延熹', start: 158, end: 167 },
+          { name: '永康', start: 167, end: 167 }
+        ]
+      },
+      {
+        id: 'eh-lingdi',
+        name: '汉灵帝',
+        title: '刘宏',
+        birthYear: 156,
+        deathYear: 189,
+        reignStart: 168,
+        reignEnd: 189,
+        eraPeriods: [
+          { name: '建宁', start: 168, end: 172 },
+          { name: '熹平', start: 172, end: 178 },
+          { name: '光和', start: 178, end: 184 },
+          { name: '中平', start: 184, end: 189 }
+        ]
+      },
+      {
+        id: 'eh-shaodi',
+        name: '汉少帝',
+        title: '刘辩（弘农王）',
+        birthYear: 176,
+        deathYear: 190,
+        reignStart: 189,
+        reignEnd: 189,
+        eraPeriods: [
+          { name: '光熹', start: 189, end: 189 },
+          { name: '昭宁', start: 189, end: 189 }
+        ]
+      },
+      {
+        id: 'eh-xiandi',
+        name: '汉献帝',
+        title: '刘协',
+        birthYear: 181,
+        deathYear: 234,
+        reignStart: 189,
+        reignEnd: 220,
+        eraPeriods: [
+          { name: '永汉', start: 189, end: 189 },
+          { name: '初平', start: 190, end: 193 },
+          { name: '兴平', start: 194, end: 195 },
+          { name: '建安', start: 196, end: 220 },
+          { name: '延康', start: 220, end: 220 }
+        ]
+      }
     ]
   },
   {
@@ -495,7 +750,20 @@ export const dynastyGroups = [
       { id: 'tang-zhongzong-2', name: '唐中宗', title: '李显（复位）', birthYear: 656, deathYear: 710, reignStart: 705, reignEnd: 710, eraName: '神龙、景龙' },
       { id: 'tang-shaodi', name: '唐殇帝', title: '李重茂', birthYear: 695, deathYear: 714, reignStart: 710, reignEnd: 710, eraName: '唐隆' },
       { id: 'tang-ruizong-2', name: '唐睿宗', title: '李旦（复位）', birthYear: 662, deathYear: 716, reignStart: 710, reignEnd: 712, eraName: '景云、太极、延和' },
-      { id: 'tang-xuanzong', name: '唐玄宗', title: '李隆基', birthYear: 685, deathYear: 762, reignStart: 712, reignEnd: 756, eraName: '开元、天宝' },
+      {
+        id: 'tang-xuanzong',
+        name: '唐玄宗',
+        title: '李隆基',
+        birthYear: 685,
+        deathYear: 762,
+        reignStart: 712,
+        reignEnd: 756,
+        eraPeriods: [
+          { name: '先天', start: 712, end: 712 },
+          { name: '开元', start: 713, end: 741 },
+          { name: '天宝', start: 742, end: 756 }
+        ]
+      },
       { id: 'tang-suzong', name: '唐肃宗', title: '李亨', birthYear: 711, deathYear: 762, reignStart: 756, reignEnd: 762, eraName: '至德等' },
       { id: 'tang-daizong', name: '唐代宗', title: '李豫', birthYear: 726, deathYear: 779, reignStart: 762, reignEnd: 779, eraName: '大历等' },
       { id: 'tang-dezong', name: '唐德宗', title: '李适', birthYear: 742, deathYear: 805, reignStart: 779, reignEnd: 805, eraName: '建中、贞元' },
@@ -853,18 +1121,30 @@ export const dynastyGroups = [
     startYear: 1636,
     endYear: 1912,
     rulers: [
-      { id: 'qing-taizu', name: '清太祖', title: '努尔哈赤', birthYear: 1559, deathYear: 1626, reignStart: 1616, reignEnd: 1626 },
-      { id: 'qing-taizong', name: '清太宗', title: '皇太极', birthYear: 1592, deathYear: 1643, reignStart: 1636, reignEnd: 1643 },
-      { id: 'qing-shunzhi', name: '顺治帝', title: '福临', birthYear: 1638, deathYear: 1661, reignStart: 1644, reignEnd: 1661 },
-      { id: 'qing-kangxi', name: '康熙帝', title: '玄烨', birthYear: 1654, deathYear: 1722, reignStart: 1661, reignEnd: 1722 },
-      { id: 'qing-yongzheng', name: '雍正帝', title: '胤禛', birthYear: 1678, deathYear: 1735, reignStart: 1722, reignEnd: 1735 },
-      { id: 'qing-qianlong', name: '乾隆帝', title: '弘历', birthYear: 1711, deathYear: 1799, reignStart: 1735, reignEnd: 1796 },
-      { id: 'qing-jiaqing', name: '嘉庆帝', title: '颙琰', birthYear: 1760, deathYear: 1820, reignStart: 1796, reignEnd: 1820 },
-      { id: 'qing-daoguang', name: '道光帝', title: '旻宁', birthYear: 1782, deathYear: 1850, reignStart: 1820, reignEnd: 1850 },
-      { id: 'qing-xianfeng', name: '咸丰帝', title: '奕詝', birthYear: 1831, deathYear: 1861, reignStart: 1850, reignEnd: 1861 },
-      { id: 'qing-tongzhi', name: '同治帝', title: '载淳', birthYear: 1856, deathYear: 1875, reignStart: 1861, reignEnd: 1875 },
-      { id: 'qing-guangxu', name: '光绪帝', title: '载湉', birthYear: 1871, deathYear: 1908, reignStart: 1875, reignEnd: 1908 },
-      { id: 'qing-xuantong', name: '宣统帝', title: '溥仪', birthYear: 1906, deathYear: 1967, reignStart: 1908, reignEnd: 1912 }
+      { id: 'qing-taizu', name: '清太祖', title: '努尔哈赤', birthYear: 1559, deathYear: 1626, reignStart: 1616, reignEnd: 1626, eraName: '天命' },
+      {
+        id: 'qing-taizong',
+        name: '清太宗',
+        title: '皇太极',
+        birthYear: 1592,
+        deathYear: 1643,
+        reignStart: 1626,
+        reignEnd: 1643,
+        eraPeriods: [
+          { name: '天聪', start: 1627, end: 1636 },
+          { name: '崇德', start: 1636, end: 1643 }
+        ]
+      },
+      { id: 'qing-shunzhi', name: '顺治帝', title: '福临', birthYear: 1638, deathYear: 1661, reignStart: 1644, reignEnd: 1661, eraName: '顺治' },
+      { id: 'qing-kangxi', name: '康熙帝', title: '玄烨', birthYear: 1654, deathYear: 1722, reignStart: 1661, reignEnd: 1722, eraName: '康熙' },
+      { id: 'qing-yongzheng', name: '雍正帝', title: '胤禛', birthYear: 1678, deathYear: 1735, reignStart: 1722, reignEnd: 1735, eraName: '雍正' },
+      { id: 'qing-qianlong', name: '乾隆帝', title: '弘历', birthYear: 1711, deathYear: 1799, reignStart: 1735, reignEnd: 1796, eraName: '乾隆' },
+      { id: 'qing-jiaqing', name: '嘉庆帝', title: '颙琰', birthYear: 1760, deathYear: 1820, reignStart: 1796, reignEnd: 1820, eraName: '嘉庆' },
+      { id: 'qing-daoguang', name: '道光帝', title: '旻宁', birthYear: 1782, deathYear: 1850, reignStart: 1820, reignEnd: 1850, eraName: '道光' },
+      { id: 'qing-xianfeng', name: '咸丰帝', title: '奕詝', birthYear: 1831, deathYear: 1861, reignStart: 1850, reignEnd: 1861, eraName: '咸丰' },
+      { id: 'qing-tongzhi', name: '同治帝', title: '载淳', birthYear: 1856, deathYear: 1875, reignStart: 1861, reignEnd: 1875, eraName: '同治' },
+      { id: 'qing-guangxu', name: '光绪帝', title: '载湉', birthYear: 1871, deathYear: 1908, reignStart: 1875, reignEnd: 1908, eraName: '光绪' },
+      { id: 'qing-xuantong', name: '宣统帝', title: '溥仪', birthYear: 1906, deathYear: 1967, reignStart: 1908, reignEnd: 1912, eraName: '宣统' }
     ]
   }
 ]
