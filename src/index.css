@@ -178,6 +178,26 @@ input[type='range'] {
   gap: 0.35rem 0.72rem;
 }
 
+.settings-groups {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.settings-group {
+  border: 1px solid rgba(179, 145, 111, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.78);
+  padding: 0.5rem 0.58rem 0.54rem;
+}
+
+.settings-group-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  color: #6c553c;
+  letter-spacing: 0.02em;
+}
+
 .setting-item {
   display: inline-flex;
   align-items: center;

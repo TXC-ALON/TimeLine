@@ -65,8 +65,11 @@ const categoryPalette = {
 
 const DEFAULT_DISPLAY_SETTINGS = {
   showAxisEdgeYears: true,
-  showTrackEdgeYears: true,
+  showDynastyTrackEdgeYears: true,
+  showRulerTrackEdgeYears: true,
   showRulerListLifeYears: true,
+  showLifeTimeline: true,
+  showReignTimeline: true,
   showReignYears: true,
   showEraTimelineDetail: false,
   showTicks: true,
@@ -74,15 +77,33 @@ const DEFAULT_DISPLAY_SETTINGS = {
   showTooltips: true
 }
 
-const DISPLAY_SETTING_ITEMS = [
-  { key: 'showAxisEdgeYears', label: '显示时间轴首尾年份' },
-  { key: 'showTrackEdgeYears', label: '显示每行首尾年份' },
-  { key: 'showRulerListLifeYears', label: '左侧显示君主生卒' },
-  { key: 'showReignYears', label: '显示在位年数标记' },
-  { key: 'showEraTimelineDetail', label: '显示年号时间轴（并排，自动适配粗细）' },
-  { key: 'showTicks', label: '显示刻度线与年份' },
-  { key: 'showPeriodBands', label: '显示分期背景色带' },
-  { key: 'showTooltips', label: '显示悬浮详情提示' }
+const DISPLAY_SETTING_GROUPS = [
+  {
+    title: '时间轴图层',
+    items: [
+      { key: 'showLifeTimeline', label: '显示生卒时间轴' },
+      { key: 'showReignTimeline', label: '显示在位时间轴' },
+      { key: 'showEraTimelineDetail', label: '显示年号时间轴' }
+    ]
+  },
+  {
+    title: '标记与文本',
+    items: [
+      { key: 'showAxisEdgeYears', label: '显示主轴首尾年份' },
+      { key: 'showDynastyTrackEdgeYears', label: '显示朝代行首尾年份' },
+      { key: 'showRulerTrackEdgeYears', label: '显示君主行首尾年份' },
+      { key: 'showRulerListLifeYears', label: '左侧显示君主生卒' },
+      { key: 'showReignYears', label: '显示在位年数标记' },
+      { key: 'showTicks', label: '显示刻度线与年份' }
+    ]
+  },
+  {
+    title: '背景与交互',
+    items: [
+      { key: 'showPeriodBands', label: '显示分期背景色带' },
+      { key: 'showTooltips', label: '显示悬浮详情提示' }
+    ]
+  }
 ]
 
 const ERA_DYNASTY_BY_GROUP_ID = {
@@ -1199,16 +1220,23 @@ function App() {
 
             <div className="control-block">
               <label>显示设置</label>
-              <div className="settings-grid">
-                {DISPLAY_SETTING_ITEMS.map((item) => (
-                  <label key={item.key} className="setting-item">
-                    <input
-                      type="checkbox"
-                      checked={displaySettings[item.key]}
-                      onChange={() => toggleDisplaySetting(item.key)}
-                    />
-                    <span>{item.label}</span>
-                  </label>
+              <div className="settings-groups">
+                {DISPLAY_SETTING_GROUPS.map((group) => (
+                  <section key={group.title} className="settings-group">
+                    <h3 className="settings-group-title">{group.title}</h3>
+                    <div className="settings-grid">
+                      {group.items.map((item) => (
+                        <label key={item.key} className="setting-item">
+                          <input
+                            type="checkbox"
+                            checked={displaySettings[item.key]}
+                            onChange={() => toggleDisplaySetting(item.key)}
+                          />
+                          <span>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </div>
@@ -1388,7 +1416,7 @@ function App() {
                           openWiki(dynasty.name)
                         }}
                       />
-                      {displaySettings.showTrackEdgeYears ? (
+                      {displaySettings.showDynastyTrackEdgeYears ? (
                         <>
                           <div className="track-edge-label start dynasty" style={{ left: `${startX}px` }}>
                             {formatAxisYear(dynasty.startYear)}
@@ -1453,6 +1481,20 @@ function App() {
                     index
                   }
                 })
+                const hasVisibleLifeTrack = displaySettings.showLifeTimeline
+                const hasVisibleReignTrack = displaySettings.showReignTimeline && hasReign
+                const hasVisibleEraTrack = displaySettings.showEraTimelineDetail && hasReign
+                let rulerEdgeStartYear = null
+                let rulerEdgeEndYear = null
+                if (hasVisibleLifeTrack) {
+                  rulerEdgeStartYear = range.start
+                  rulerEdgeEndYear = range.end
+                } else if (hasVisibleReignTrack || hasVisibleEraTrack) {
+                  rulerEdgeStartYear = reignBoundStart
+                  rulerEdgeEndYear = reignBoundEnd
+                }
+                const rulerEdgeStartX = typeof rulerEdgeStartYear === 'number' ? getXByYear(rulerEdgeStartYear) : 0
+                const rulerEdgeEndX = typeof rulerEdgeEndYear === 'number' ? getXByYear(rulerEdgeEndYear) : 0
                 const highlighted = row.key === highlightedRulerKey
 
                 return (
@@ -1495,51 +1537,55 @@ function App() {
                       </span>
                     </div>
 
-                    {hasLife ? (
-                      <div
-                        className="life-track"
-                        style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
-                        onMouseEnter={(event) =>
-                          showTooltip(event, `${ruler.name}（${ruler.title}）`, [
-                            `所属：${dynasty.name}`,
-                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                            formatLifeText(ruler),
-                            formatReignText(ruler, dynasty),
-                            formatEraText(ruler, dynasty),
-                            '点击可打开中文维基百科'
-                          ].filter(Boolean))
-                        }
-                        onMouseMove={moveTooltip}
-                        onMouseLeave={hideTooltip}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openWiki(ruler.name)
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className="life-track dashed"
-                        style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
-                        onMouseEnter={(event) =>
-                          showTooltip(event, `${ruler.name}（${ruler.title}）`, [
-                            `所属：${dynasty.name}`,
-                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                            `区间：${formatPeriod(range.start, range.end)}`,
-                            formatReignText(ruler, dynasty),
-                            formatEraText(ruler, dynasty),
-                            '点击可打开中文维基百科'
-                          ].filter(Boolean))
-                        }
-                        onMouseMove={moveTooltip}
-                        onMouseLeave={hideTooltip}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openWiki(ruler.name)
-                        }}
-                      />
-                    )}
+                    {displaySettings.showLifeTimeline
+                      ? hasLife
+                        ? (
+                            <div
+                              className="life-track"
+                              style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
+                              onMouseEnter={(event) =>
+                                showTooltip(event, `${ruler.name}（${ruler.title}）`, [
+                                  `所属：${dynasty.name}`,
+                                  ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                                  formatLifeText(ruler),
+                                  formatReignText(ruler, dynasty),
+                                  formatEraText(ruler, dynasty),
+                                  '点击可打开中文维基百科'
+                                ].filter(Boolean))
+                              }
+                              onMouseMove={moveTooltip}
+                              onMouseLeave={hideTooltip}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openWiki(ruler.name)
+                              }}
+                            />
+                          )
+                        : (
+                            <div
+                              className="life-track dashed"
+                              style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
+                              onMouseEnter={(event) =>
+                                showTooltip(event, `${ruler.name}（${ruler.title}）`, [
+                                  `所属：${dynasty.name}`,
+                                  ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                                  `区间：${formatPeriod(range.start, range.end)}`,
+                                  formatReignText(ruler, dynasty),
+                                  formatEraText(ruler, dynasty),
+                                  '点击可打开中文维基百科'
+                                ].filter(Boolean))
+                              }
+                              onMouseMove={moveTooltip}
+                              onMouseLeave={hideTooltip}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openWiki(ruler.name)
+                              }}
+                            />
+                          )
+                      : null}
 
-                    {hasReign
+                    {hasReign && displaySettings.showReignTimeline
                       ? reignSegments.map((period, index) => (
                           <div
                             key={`${row.key}:reign:${index}`}
@@ -1595,7 +1641,7 @@ function App() {
                         ))
                       : null}
 
-                    {hasReign && displaySettings.showReignYears && reignYears !== null ? (
+                    {hasReign && displaySettings.showReignTimeline && displaySettings.showReignYears && reignYears !== null ? (
                       <div
                         className="reign-years-label"
                         style={{
@@ -1606,13 +1652,15 @@ function App() {
                       </div>
                     ) : null}
 
-                    {displaySettings.showTrackEdgeYears ? (
+                    {displaySettings.showRulerTrackEdgeYears &&
+                    typeof rulerEdgeStartYear === 'number' &&
+                    typeof rulerEdgeEndYear === 'number' ? (
                       <>
-                        <div className="track-edge-label start ruler" style={{ left: `${startX}px` }}>
-                          {formatAxisYear(range.start)}
+                        <div className="track-edge-label start ruler" style={{ left: `${rulerEdgeStartX}px` }}>
+                          {formatAxisYear(rulerEdgeStartYear)}
                         </div>
-                        <div className="track-edge-label end ruler" style={{ left: `${endX}px` }}>
-                          {formatAxisYear(range.end)}
+                        <div className="track-edge-label end ruler" style={{ left: `${rulerEdgeEndX}px` }}>
+                          {formatAxisYear(rulerEdgeEndYear)}
                         </div>
                       </>
                     ) : null}
