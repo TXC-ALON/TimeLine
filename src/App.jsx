@@ -1,14 +1,55 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TIMELINE_MAX_YEAR, TIMELINE_MIN_YEAR, dynastyGroups } from './data/timelineData'
 
 const LABEL_WIDTH = 280
 const AXIS_HEIGHT = 72
 const DYNASTY_ROW_HEIGHT = 52
 const RULER_ROW_HEIGHT = 44
-const YEAR_TICK_STEP = 100
 const MIN_SCALE = 0.4
-const MAX_SCALE = 2.4
+const MAX_SCALE = 20
 const DEFAULT_SCALE = 0.85
+const WHEEL_ZOOM_FACTOR = 1.12
+const SPRING_AUTUMN_END = -476
+const WARRING_STATES_START = -475
+
+const THREE_KINGDOM_IDS = new Set(['cao-wei', 'shu-han', 'sun-wu'])
+
+const FIVE_DYNASTIES_TEN_KINGDOM_IDS = new Set([
+  'later-liang',
+  'later-tang',
+  'later-jin',
+  'later-han',
+  'later-zhou',
+  'ten-wu',
+  'ten-min',
+  'ten-chu',
+  'ten-jingnan',
+  'ten-southern-tang',
+  'ten-wuyue',
+  'ten-former-shu',
+  'ten-later-shu',
+  'ten-southern-han',
+  'ten-northern-han'
+])
+
+const PERIOD_BANDS = [
+  { id: 'band-xia', label: '夏', startYear: -2070, endYear: -1600, color: '#8f6c49' },
+  { id: 'band-shang', label: '商', startYear: -1600, endYear: -1046, color: '#7c5a3f' },
+  { id: 'band-zhou', label: '周', startYear: -1046, endYear: -771, color: '#6f5b43' },
+  { id: 'band-spring-autumn', label: '春秋', startYear: -770, endYear: -476, color: '#7d6846' },
+  { id: 'band-warring', label: '战国', startYear: -475, endYear: -221, color: '#8b7348' },
+  { id: 'band-qin', label: '秦', startYear: -221, endYear: -207, color: '#8f4a36' },
+  { id: 'band-han', label: '汉', startYear: -202, endYear: 220, color: '#9a4d34' },
+  { id: 'band-three', label: '三国', startYear: 220, endYear: 280, color: '#7d4a6a' },
+  { id: 'band-wjnb', label: '魏晋南北朝', startYear: 280, endYear: 589, color: '#4b6682' },
+  { id: 'band-sui', label: '隋', startYear: 581, endYear: 618, color: '#6b5f7b' },
+  { id: 'band-tang', label: '唐', startYear: 618, endYear: 907, color: '#8f3f31' },
+  { id: 'band-five-ten', label: '五代十国', startYear: 907, endYear: 979, color: '#6e4f7c' },
+  { id: 'band-song', label: '宋', startYear: 960, endYear: 1279, color: '#4c6f5c' },
+  { id: 'band-yuan', label: '元', startYear: 1271, endYear: 1368, color: '#4f6388' },
+  { id: 'band-ming', label: '明', startYear: 1368, endYear: 1644, color: '#915339' },
+  { id: 'band-qing', label: '清', startYear: 1636, endYear: 1912, color: '#487062' }
+]
 
 const categoryPalette = {
   上古三代: '#78543a',
@@ -39,6 +80,135 @@ function formatPeriod(start, end) {
   return `${formatYear(start)} - ${formatYear(end)}`
 }
 
+function buildWikiUrl(subject) {
+  return `https://zh.wikipedia.org/w/index.php?search=${encodeURIComponent(subject)}`
+}
+
+function annotateRuler(ruler, polityName) {
+  return {
+    ...ruler,
+    sourcePolity: polityName,
+    title: ruler.title ? `${ruler.title}（${polityName}）` : polityName
+  }
+}
+
+function getRulerPoint(ruler, fallback) {
+  return ruler.reignStart ?? ruler.reignEnd ?? ruler.birthYear ?? ruler.deathYear ?? fallback
+}
+
+function mergePeriodGroups(inputGroups) {
+  const normalGroups = []
+  const springWarringGroups = []
+  const threeKingdomGroups = []
+  const weiJinGroups = []
+  const fiveDynGroups = []
+
+  inputGroups.forEach((group) => {
+    if (group.category === '春秋战国') {
+      springWarringGroups.push(group)
+      return
+    }
+    if (group.category === '魏晋南北朝') {
+      weiJinGroups.push(group)
+      return
+    }
+    if (THREE_KINGDOM_IDS.has(group.id)) {
+      threeKingdomGroups.push(group)
+      return
+    }
+    if (FIVE_DYNASTIES_TEN_KINGDOM_IDS.has(group.id)) {
+      fiveDynGroups.push(group)
+      return
+    }
+    normalGroups.push(group)
+  })
+
+  const merged = [...normalGroups]
+
+  if (springWarringGroups.length > 0) {
+    const springRulers = []
+    const warringRulers = []
+
+    springWarringGroups.forEach((group) => {
+      group.rulers.forEach((ruler) => {
+        const point = getRulerPoint(ruler, group.startYear)
+        if (point <= SPRING_AUTUMN_END) {
+          springRulers.push(annotateRuler(ruler, group.name))
+        } else {
+          warringRulers.push(annotateRuler(ruler, group.name))
+        }
+      })
+    })
+
+    springRulers.sort((a, b) => getRulerPoint(a, TIMELINE_MIN_YEAR) - getRulerPoint(b, TIMELINE_MIN_YEAR))
+    warringRulers.sort((a, b) => getRulerPoint(a, TIMELINE_MIN_YEAR) - getRulerPoint(b, TIMELINE_MIN_YEAR))
+
+    merged.push({
+      id: 'period-spring-autumn',
+      name: '春秋',
+      category: '春秋战国',
+      startYear: -770,
+      endYear: SPRING_AUTUMN_END,
+      rulers: springRulers
+    })
+    merged.push({
+      id: 'period-warring-states',
+      name: '战国',
+      category: '春秋战国',
+      startYear: WARRING_STATES_START,
+      endYear: -221,
+      rulers: warringRulers
+    })
+  }
+
+  if (weiJinGroups.length > 0) {
+    const rulers = weiJinGroups
+      .flatMap((group) => group.rulers.map((ruler) => annotateRuler(ruler, group.name)))
+      .sort((a, b) => getRulerPoint(a, TIMELINE_MIN_YEAR) - getRulerPoint(b, TIMELINE_MIN_YEAR))
+
+    merged.push({
+      id: 'period-wei-jin-south-north',
+      name: '魏晋南北朝',
+      category: '魏晋南北朝',
+      startYear: 265,
+      endYear: 589,
+      rulers
+    })
+  }
+
+  if (threeKingdomGroups.length > 0) {
+    const rulers = threeKingdomGroups
+      .flatMap((group) => group.rulers.map((ruler) => annotateRuler(ruler, group.name)))
+      .sort((a, b) => getRulerPoint(a, TIMELINE_MIN_YEAR) - getRulerPoint(b, TIMELINE_MIN_YEAR))
+
+    merged.push({
+      id: 'period-three-kingdoms',
+      name: '三国',
+      category: '秦汉三国',
+      startYear: 220,
+      endYear: 280,
+      rulers
+    })
+  }
+
+  if (fiveDynGroups.length > 0) {
+    const rulers = fiveDynGroups
+      .flatMap((group) => group.rulers.map((ruler) => annotateRuler(ruler, group.name)))
+      .sort((a, b) => getRulerPoint(a, TIMELINE_MIN_YEAR) - getRulerPoint(b, TIMELINE_MIN_YEAR))
+
+    merged.push({
+      id: 'period-five-dynasties-ten-kingdoms',
+      name: '五代十国',
+      category: '隋唐五代十国',
+      startYear: 907,
+      endYear: 979,
+      rulers
+    })
+  }
+
+  return merged
+}
+
 function includesKeyword(value, keyword) {
   if (typeof value !== 'string') {
     return false
@@ -61,13 +231,24 @@ function getRulerRange(ruler, dynasty) {
   return { start, end }
 }
 
-function getYearTicks() {
+function getTickStep(spanYears) {
+  const targetTicks = 10
+  const rough = Math.max(1, spanYears / targetTicks)
+  const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000]
+  const found = steps.find((item) => item >= rough)
+  return found ?? 1000
+}
+
+function getYearTicks(startYear, endYear) {
+  const min = Math.min(startYear, endYear)
+  const max = Math.max(startYear, endYear)
+  const step = getTickStep(max - min)
   const ticks = []
-  for (let year = TIMELINE_MIN_YEAR; year <= TIMELINE_MAX_YEAR; year += YEAR_TICK_STEP) {
+  for (let year = min; year <= max; year += step) {
     ticks.push(year)
   }
-  if (ticks[ticks.length - 1] !== TIMELINE_MAX_YEAR) {
-    ticks.push(TIMELINE_MAX_YEAR)
+  if (ticks[ticks.length - 1] !== max) {
+    ticks.push(max)
   }
   return ticks
 }
@@ -75,9 +256,11 @@ function getYearTicks() {
 function App() {
   const timelineViewportRef = useRef(null)
   const dragStateRef = useRef({ active: false, startX: 0, startScrollLeft: 0 })
+  const pendingScrollLeftRef = useRef(null)
 
   const sortedDynasties = useMemo(() => {
-    return [...dynastyGroups].sort((a, b) => {
+    const merged = mergePeriodGroups(dynastyGroups)
+    return [...merged].sort((a, b) => {
       if (a.startYear !== b.startYear) {
         return a.startYear - b.startYear
       }
@@ -96,6 +279,8 @@ function App() {
   const [activeCategories, setActiveCategories] = useState(categories)
   const [expandedDynasties, setExpandedDynasties] = useState(new Set())
   const [selectedKey, setSelectedKey] = useState(`dynasty:${sortedDynasties[0]?.id ?? ''}`)
+  const [tooltip, setTooltip] = useState(null)
+  const [subTimelineId, setSubTimelineId] = useState(null)
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -138,11 +323,35 @@ function App() {
     }, [])
   }, [activeCategories, normalizedSearch, sortedDynasties, windowEnd, windowStart])
 
+  const dynastyLookup = useMemo(() => {
+    const map = new Map()
+    sortedDynasties.forEach((item) => map.set(item.id, item))
+    return map
+  }, [sortedDynasties])
+
+  const subTimelineDynasty = subTimelineId ? dynastyLookup.get(subTimelineId) ?? null : null
+  const isSubTimeline = Boolean(subTimelineDynasty)
+
+  const displayDynasties = useMemo(() => {
+    if (!subTimelineDynasty) {
+      return filteredDynasties
+    }
+    const allRulers = [...subTimelineDynasty.rulers].sort(
+      (a, b) => getRulerPoint(a, subTimelineDynasty.startYear) - getRulerPoint(b, subTimelineDynasty.startYear)
+    )
+    return [
+      {
+        ...subTimelineDynasty,
+        visibleRulers: allRulers
+      }
+    ]
+  }, [filteredDynasties, subTimelineDynasty])
+
   const timelineRows = useMemo(() => {
     const rows = []
     let top = AXIS_HEIGHT
 
-    filteredDynasties.forEach((dynasty) => {
+    displayDynasties.forEach((dynasty) => {
       rows.push({
         key: `dynasty:${dynasty.id}`,
         type: 'dynasty',
@@ -152,7 +361,7 @@ function App() {
       })
       top += DYNASTY_ROW_HEIGHT
 
-      if (expandedDynasties.has(dynasty.id)) {
+      if (isSubTimeline || expandedDynasties.has(dynasty.id)) {
         dynasty.visibleRulers.forEach((ruler) => {
           rows.push({
             key: `ruler:${ruler.id}`,
@@ -171,7 +380,7 @@ function App() {
       rows,
       height: top + 24
     }
-  }, [expandedDynasties, filteredDynasties])
+  }, [displayDynasties, expandedDynasties, isSubTimeline])
 
   const rowMap = useMemo(() => {
     const map = new Map()
@@ -183,13 +392,114 @@ function App() {
   const effectiveSelectedKey = selectedKey && rowMap.has(selectedKey) ? selectedKey : fallbackKey
   const selectedRow = effectiveSelectedKey ? rowMap.get(effectiveSelectedKey) : null
 
-  const totalYears = TIMELINE_MAX_YEAR - TIMELINE_MIN_YEAR
+  const axisMinYear = isSubTimeline ? subTimelineDynasty.startYear : TIMELINE_MIN_YEAR
+  const axisMaxYear = isSubTimeline ? subTimelineDynasty.endYear : TIMELINE_MAX_YEAR
+  const totalYears = Math.max(1, axisMaxYear - axisMinYear)
   const timelineWidth = LABEL_WIDTH + totalYears * zoom + 64
-  const yearTicks = useMemo(() => getYearTicks(), [])
+  const yearTicks = useMemo(() => getYearTicks(axisMinYear, axisMaxYear), [axisMaxYear, axisMinYear])
+  const periodBands = useMemo(() => {
+    if (isSubTimeline) {
+      return []
+    }
+    return PERIOD_BANDS.filter((item) => overlap(item.startYear, item.endYear, TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR))
+  }, [isSubTimeline])
 
   const getXByYear = (year) => {
-    const clampedYear = clamp(year, TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR)
-    return LABEL_WIDTH + (clampedYear - TIMELINE_MIN_YEAR) * zoom
+    const clampedYear = clamp(year, axisMinYear, axisMaxYear)
+    return LABEL_WIDTH + (clampedYear - axisMinYear) * zoom
+  }
+
+  const zoomToRange = (rangeStart, rangeEnd) => {
+    if (!timelineViewportRef.current) {
+      return
+    }
+    const viewport = timelineViewportRef.current
+    const start = clamp(Math.min(rangeStart, rangeEnd), axisMinYear, axisMaxYear)
+    const end = clamp(Math.max(rangeStart, rangeEnd), axisMinYear, axisMaxYear)
+    const spanYears = Math.max(1, end - start)
+    const usableWidth = Math.max(220, viewport.clientWidth - LABEL_WIDTH - 48)
+    const targetZoom = clamp(Number((usableWidth / spanYears).toFixed(4)), MIN_SCALE, MAX_SCALE)
+    const centerYear = (start + end) / 2
+    const nextScrollLeft =
+      LABEL_WIDTH + (centerYear - axisMinYear) * targetZoom - viewport.clientWidth / 2
+
+    if (Math.abs(targetZoom - zoom) < 0.0001) {
+      viewport.scrollLeft = Math.max(0, nextScrollLeft)
+      return
+    }
+
+    pendingScrollLeftRef.current = Math.max(0, nextScrollLeft)
+    setZoom(targetZoom)
+  }
+
+  const enterSubTimeline = (dynasty) => {
+    setSubTimelineId(dynasty.id)
+    setSelectedKey(`dynasty:${dynasty.id}`)
+    setExpandedDynasties((current) => {
+      const next = new Set(current)
+      next.add(dynasty.id)
+      return next
+    })
+
+    if (timelineViewportRef.current) {
+      const viewport = timelineViewportRef.current
+      const usableWidth = Math.max(220, viewport.clientWidth - LABEL_WIDTH - 48)
+      const spanYears = Math.max(1, dynasty.endYear - dynasty.startYear)
+      const fitZoom = clamp(Number((usableWidth / spanYears).toFixed(4)), MIN_SCALE, MAX_SCALE)
+      if (Math.abs(fitZoom - zoom) < 0.0001) {
+        viewport.scrollLeft = 0
+        return
+      }
+      pendingScrollLeftRef.current = 0
+      setZoom(fitZoom)
+    }
+  }
+
+  const exitSubTimeline = () => {
+    setSubTimelineId(null)
+    if (timelineViewportRef.current && Math.abs(zoom - DEFAULT_SCALE) < 0.0001) {
+      timelineViewportRef.current.scrollLeft = 0
+      return
+    }
+    pendingScrollLeftRef.current = 0
+    setZoom(DEFAULT_SCALE)
+  }
+
+  useEffect(() => {
+    if (pendingScrollLeftRef.current === null || !timelineViewportRef.current) {
+      return
+    }
+    timelineViewportRef.current.scrollLeft = pendingScrollLeftRef.current
+    pendingScrollLeftRef.current = null
+  }, [zoom])
+
+  const openWiki = (subject) => {
+    window.open(buildWikiUrl(subject), '_blank', 'noopener,noreferrer')
+  }
+
+  const showTooltip = (event, title, lines) => {
+    setTooltip({
+      title,
+      lines,
+      x: event.clientX + 14,
+      y: event.clientY + 14
+    })
+  }
+
+  const moveTooltip = (event) => {
+    setTooltip((current) =>
+      current
+        ? {
+            ...current,
+            x: event.clientX + 14,
+            y: event.clientY + 14
+          }
+        : null
+    )
+  }
+
+  const hideTooltip = () => {
+    setTooltip(null)
   }
 
   const handleWindowStartChange = (value) => {
@@ -226,7 +536,7 @@ function App() {
   }
 
   const expandAllFiltered = () => {
-    setExpandedDynasties(new Set(filteredDynasties.map((item) => item.id)))
+    setExpandedDynasties(new Set(displayDynasties.map((item) => item.id)))
   }
 
   const collapseAll = () => {
@@ -237,6 +547,8 @@ function App() {
     setSearchText('')
     setActiveCategories(categories)
     setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
+    setSubTimelineId(null)
+    setZoom(DEFAULT_SCALE)
   }
 
   const handlePointerDown = (event) => {
@@ -277,14 +589,44 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (!timelineViewportRef.current) {
+      return undefined
+    }
+    const viewport = timelineViewportRef.current
+    const handleWheel = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+
+      const rect = viewport.getBoundingClientRect()
+      const pointerX = event.clientX - rect.left
+      const yearAtPointer = axisMinYear + (viewport.scrollLeft + pointerX - LABEL_WIDTH) / zoom
+      const factor = event.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR
+
+      setZoom((prevZoom) => {
+        const nextZoom = clamp(Number((prevZoom * factor).toFixed(4)), MIN_SCALE, MAX_SCALE)
+        const nextScrollLeft = LABEL_WIDTH + (yearAtPointer - axisMinYear) * nextZoom - pointerX
+        pendingScrollLeftRef.current = Math.max(0, nextScrollLeft)
+        return nextZoom
+      })
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel)
+    }
+  }, [axisMinYear, zoom])
+
   return (
     <div className="app-shell">
       <header className="hero">
         <p className="eyebrow">Imperial Timeline</p>
         <h1>中国君主时间轴（按朝代可展开）</h1>
         <p>
-          范围：{formatYear(TIMELINE_MIN_YEAR)} 至 {formatYear(TIMELINE_MAX_YEAR)}。当前显示
-          {filteredDynasties.length} 个朝代/政权（点击朝代行可展开或收起君主）。
+          范围：{formatYear(axisMinYear)} 至 {formatYear(axisMaxYear)}。
+          {isSubTimeline
+            ? ` 当前为子时间轴：${subTimelineDynasty.name}。`
+            : ` 当前显示${filteredDynasties.length}个朝代/政权（点击朝代行可展开或收起君主）。`}
         </p>
       </header>
 
@@ -360,6 +702,11 @@ function App() {
           <button className="secondary-btn" type="button" onClick={resetFilters}>
             重置筛选
           </button>
+          {isSubTimeline ? (
+            <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
+              退出子时间轴
+            </button>
+          ) : null}
           <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
             展开当前结果
           </button>
@@ -373,7 +720,7 @@ function App() {
         <article className="timeline-card">
           <div className="timeline-head">
             <h2>时间轴视图</h2>
-            <p>拖动空白区域可横向平移。点击朝代行展开君主，点击具体君主查看详情。</p>
+            <p>拖动空白区域可横向平移，滚轮可缩放。点击朝代行展开君主，点击时间条可打开维基。</p>
           </div>
 
           <div
@@ -384,8 +731,28 @@ function App() {
             onPointerUp={stopDragging}
             onPointerCancel={stopDragging}
             onPointerLeave={stopDragging}
+            onMouseLeave={hideTooltip}
           >
             <div className="timeline-stage" style={{ width: `${timelineWidth}px`, height: `${timelineRows.height}px` }}>
+              {periodBands.map((item) => {
+                  const startX = getXByYear(item.startYear)
+                  const endX = getXByYear(item.endYear)
+                  const width = Math.max(2, endX - startX)
+                  return (
+                    <div
+                      key={item.id}
+                      className="period-band"
+                      style={{
+                        left: `${startX}px`,
+                        width: `${width}px`,
+                        '--band-color': item.color
+                      }}
+                    >
+                      <span className="period-label">{item.label}</span>
+                    </div>
+                  )
+                })}
+
               <div className="axis-line" style={{ left: `${LABEL_WIDTH}px` }} />
 
               {yearTicks.map((year) => {
@@ -432,12 +799,39 @@ function App() {
                       tabIndex={0}
                       aria-expanded={expanded}
                     >
-                      <div className="name-slot dynasty">
+                      <div
+                        className="name-slot dynasty"
+                        onDoubleClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          enterSubTimeline(dynasty)
+                        }}
+                        title="双击进入子时间轴并铺满该朝代"
+                      >
                         <span className="caret">{expanded ? '▾' : '▸'}</span>
-                        <strong>{dynasty.name}</strong>
-                        <span>{dynasty.category}</span>
+                        <div className="dynasty-label">
+                          <strong>{dynasty.name}</strong>
+                          <span className="meta">{dynasty.category}</span>
+                          <span className="range">{formatPeriod(dynasty.startYear, dynasty.endYear)}</span>
+                        </div>
                       </div>
-                      <div className="dynasty-track" style={{ left: `${startX}px`, width: `${width}px` }} />
+                      <div
+                        className="dynasty-track"
+                        style={{ left: `${startX}px`, width: `${width}px` }}
+                        onMouseEnter={(event) =>
+                          showTooltip(event, dynasty.name, [
+                            `类别：${dynasty.category}`,
+                            `区间：${formatPeriod(dynasty.startYear, dynasty.endYear)}`,
+                            '点击可打开中文维基百科'
+                          ])
+                        }
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openWiki(dynasty.name)
+                        }}
+                      />
                     </div>
                   )
                 }
@@ -473,19 +867,81 @@ function App() {
                     role="button"
                     tabIndex={0}
                   >
-                    <div className="name-slot ruler">
+                    <div
+                      className="name-slot ruler"
+                      onDoubleClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setSelectedKey(row.key)
+                        zoomToRange(range.start, range.end)
+                      }}
+                      title="双击缩放到该人物时间段"
+                    >
                       <strong>{ruler.name}</strong>
                       <span>{ruler.title}</span>
                     </div>
 
                     {hasLife ? (
-                      <div className="life-track" style={{ left: `${startX}px`, width: `${intervalWidth}px` }} />
+                      <div
+                        className="life-track"
+                        style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
+                        onMouseEnter={(event) =>
+                          showTooltip(event, `${ruler.name}（${ruler.title}）`, [
+                            `所属：${dynasty.name}`,
+                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                            `生卒：${formatPeriod(ruler.birthYear, ruler.deathYear)}`,
+                            `在位：${formatPeriod(ruler.reignStart, ruler.reignEnd)}`,
+                            '点击可打开中文维基百科'
+                          ].filter(Boolean))
+                        }
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openWiki(ruler.name)
+                        }}
+                      />
                     ) : (
-                      <div className="life-track dashed" style={{ left: `${startX}px`, width: `${intervalWidth}px` }} />
+                      <div
+                        className="life-track dashed"
+                        style={{ left: `${startX}px`, width: `${intervalWidth}px` }}
+                        onMouseEnter={(event) =>
+                          showTooltip(event, `${ruler.name}（${ruler.title}）`, [
+                            `所属：${dynasty.name}`,
+                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                            `区间：${formatPeriod(range.start, range.end)}`,
+                            `在位：${formatPeriod(ruler.reignStart, ruler.reignEnd)}`,
+                            '点击可打开中文维基百科'
+                          ].filter(Boolean))
+                        }
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openWiki(ruler.name)
+                        }}
+                      />
                     )}
 
                     {hasReign ? (
-                      <div className="reign-track" style={{ left: `${reignStartX}px`, width: `${reignWidth}px` }} />
+                      <div
+                        className="reign-track"
+                        style={{ left: `${reignStartX}px`, width: `${reignWidth}px` }}
+                        onMouseEnter={(event) =>
+                          showTooltip(event, `${ruler.name}在位时间`, [
+                            `所属：${dynasty.name}`,
+                            ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                            `在位：${formatPeriod(ruler.reignStart, ruler.reignEnd)}`,
+                            '点击可打开中文维基百科'
+                          ].filter(Boolean))
+                        }
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openWiki(ruler.name)
+                        }}
+                      />
                     ) : null}
                   </div>
                 )
@@ -519,6 +975,8 @@ function App() {
                 <dl>
                   <dt>称谓</dt>
                   <dd>{selectedRow.ruler.title || '未知'}</dd>
+                  <dt>原政权</dt>
+                  <dd>{selectedRow.ruler.sourcePolity || selectedRow.dynasty.name}</dd>
                   <dt>出生</dt>
                   <dd>{formatYear(selectedRow.ruler.birthYear)}</dd>
                   <dt>死亡</dt>
@@ -539,6 +997,15 @@ function App() {
           )}
         </aside>
       </section>
+
+      {tooltip ? (
+        <div className="hover-tooltip" style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}>
+          <strong>{tooltip.title}</strong>
+          {tooltip.lines.map((line, index) => (
+            <span key={index}>{line}</span>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

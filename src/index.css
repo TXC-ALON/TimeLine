@@ -184,6 +184,7 @@ input[type='range'] {
   border: 1px solid #d6c4a5;
   border-radius: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
   background:
     linear-gradient(180deg, rgba(223, 201, 167, 0.28), rgba(251, 247, 238, 0.95) 10%),
     #f9f4e7;
@@ -198,6 +199,25 @@ input[type='range'] {
 
 .timeline-stage {
   position: relative;
+}
+
+.period-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--band-color) 16%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--band-color) 35%, transparent);
+  pointer-events: none;
+}
+
+.period-label {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font-size: 0.66rem;
+  color: color-mix(in srgb, var(--band-color) 72%, #1f1e1b);
+  white-space: nowrap;
+  opacity: 0.82;
 }
 
 .axis-line {
@@ -250,11 +270,17 @@ input[type='range'] {
   display: grid;
   align-content: center;
   background: linear-gradient(90deg, rgba(255, 250, 239, 0.95), rgba(255, 250, 239, 0.22));
+  cursor: zoom-in;
 }
 
 .name-slot.dynasty {
   grid-template-columns: auto 1fr;
   column-gap: 0.45rem;
+}
+
+.dynasty-label {
+  display: grid;
+  align-content: center;
 }
 
 .name-slot.ruler {
@@ -280,6 +306,15 @@ input[type='range'] {
   color: #6b5e51;
 }
 
+.dynasty-label .meta {
+  font-size: 0.7rem;
+}
+
+.dynasty-label .range {
+  font-size: 0.66rem;
+  color: #7a6d5f;
+}
+
 .dynasty-track,
 .life-track,
 .reign-track {
@@ -291,12 +326,16 @@ input[type='range'] {
   top: 21px;
   height: 8px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--dynasty-color) 42%, #f1d8b4), var(--dynasty-color));
+  cursor: pointer;
+  z-index: 1;
 }
 
 .life-track {
   top: 20px;
   height: 6px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--dynasty-color) 38%, #ead4b0), var(--dynasty-color));
+  cursor: pointer;
+  z-index: 1;
 }
 
 .life-track.dashed {
@@ -311,6 +350,8 @@ input[type='range'] {
   top: 24px;
   height: 4px;
   background: rgba(30, 34, 30, 0.72);
+  cursor: pointer;
+  z-index: 2;
 }
 
 .detail-card {
@@ -355,6 +396,29 @@ input[type='range'] {
   color: #4b493f;
   font-size: 0.93rem;
   line-height: 1.52;
+}
+
+.hover-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 260px;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 79, 56, 0.35);
+  background: rgba(255, 252, 245, 0.97);
+  box-shadow: 0 12px 22px rgba(68, 49, 34, 0.2);
+  display: grid;
+  gap: 0.14rem;
+  pointer-events: none;
+}
+
+.hover-tooltip strong {
+  font-size: 0.8rem;
+}
+
+.hover-tooltip span {
+  font-size: 0.72rem;
+  color: #4f473f;
 }
 
 @media (max-width: 700px) {
