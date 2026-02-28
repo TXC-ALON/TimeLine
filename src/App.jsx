@@ -330,6 +330,7 @@ function App() {
   const [selectedKey, setSelectedKey] = useState(`dynasty:${sortedDynasties[0]?.id ?? ''}`)
   const [tooltip, setTooltip] = useState(null)
   const [subTimelineId, setSubTimelineId] = useState(null)
+  const [highlightedRulerKey, setHighlightedRulerKey] = useState(null)
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -605,6 +606,7 @@ function App() {
     setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
     setSubTimelineId(null)
     setZoom(DEFAULT_SCALE)
+    setHighlightedRulerKey(null)
   }
 
   const handlePointerDown = (event) => {
@@ -928,11 +930,12 @@ function App() {
                 const reignStartX = hasReign ? getXByYear(ruler.reignStart) : 0
                 const reignEndX = hasReign ? getXByYear(ruler.reignEnd) : 0
                 const reignWidth = hasReign ? Math.max(8, reignEndX - reignStartX) : 0
+                const highlighted = row.key === highlightedRulerKey
 
                 return (
                   <div
                     key={row.key}
-                    className={`timeline-row ruler-row ${selected ? 'selected' : ''}`}
+                    className={`timeline-row ruler-row ${selected ? 'selected' : ''} ${highlighted ? 'highlighted' : ''}`}
                     style={{
                       top: `${row.top}px`,
                       '--row-height': `${row.height}px`,
@@ -955,9 +958,10 @@ function App() {
                         event.preventDefault()
                         event.stopPropagation()
                         setSelectedKey(row.key)
+                        setHighlightedRulerKey(row.key)
                         zoomToRange(range.start, range.end)
                       }}
-                      title="双击缩放到该人物时间段"
+                      title="双击缩放并高亮该人物时间段"
                     >
                       <strong>{ruler.name}</strong>
                       <span>{ruler.title}</span>

@@ -259,6 +259,28 @@ input[type='range'] {
   background: linear-gradient(90deg, rgba(208, 175, 128, 0.08), rgba(142, 177, 167, 0.11), rgba(208, 175, 128, 0));
 }
 
+.timeline-row.ruler-row.highlighted {
+  background: linear-gradient(90deg, rgba(255, 205, 130, 0.16), rgba(255, 189, 98, 0.2), rgba(255, 205, 130, 0.05));
+}
+
+.timeline-row.ruler-row.highlighted .name-slot.ruler {
+  background: linear-gradient(90deg, rgba(255, 247, 228, 0.98), rgba(255, 225, 168, 0.52));
+}
+
+.timeline-row.ruler-row.highlighted .life-track {
+  background: linear-gradient(90deg, #f3a74c, #e47e29);
+  box-shadow: 0 0 0 1px rgba(161, 86, 32, 0.16), 0 2px 10px rgba(169, 89, 31, 0.28);
+}
+
+.timeline-row.ruler-row.highlighted .life-track.dashed {
+  background: repeating-linear-gradient(90deg, #f3a74c 0 8px, rgba(255, 245, 228, 0.9) 8px 12px);
+}
+
+.timeline-row.ruler-row.highlighted .reign-track {
+  background: #762e19;
+  box-shadow: 0 0 0 1px rgba(118, 46, 25, 0.28);
+}
+
 .name-slot {
   position: sticky;
   left: 8px;
