@@ -877,6 +877,19 @@ function App() {
     }
     return getDynastyLifeBounds(subTimelineDynasty)
   }, [subTimelineDynasty])
+  const mainTimelineBounds = useMemo(() => {
+    const activeDynasties = sortedDynasties.filter((item) => activeDynastyIds.includes(item.id))
+    if (activeDynasties.length === 0) {
+      return {
+        start: TIMELINE_MIN_YEAR,
+        end: TIMELINE_MAX_YEAR
+      }
+    }
+    return {
+      start: Math.min(...activeDynasties.map((item) => item.startYear)),
+      end: Math.max(...activeDynasties.map((item) => item.endYear))
+    }
+  }, [activeDynastyIds, sortedDynasties])
 
   const displayDynasties = useMemo(() => {
     if (!subTimelineDynasty) {
@@ -939,8 +952,8 @@ function App() {
   const effectiveSelectedKey = selectedKey && rowMap.has(selectedKey) ? selectedKey : fallbackKey
   const selectedRow = effectiveSelectedKey ? rowMap.get(effectiveSelectedKey) : null
 
-  const axisMinYear = isSubTimeline ? subTimelineBounds.start : TIMELINE_MIN_YEAR
-  const axisMaxYear = isSubTimeline ? subTimelineBounds.end : TIMELINE_MAX_YEAR
+  const axisMinYear = isSubTimeline ? subTimelineBounds.start : mainTimelineBounds.start
+  const axisMaxYear = isSubTimeline ? subTimelineBounds.end : mainTimelineBounds.end
   const totalYears = Math.max(1, axisMaxYear - axisMinYear)
   const timelineWidth = LABEL_WIDTH + totalYears * zoom + 64
   const yearTicks = useMemo(() => getYearTicks(axisMinYear, axisMaxYear), [axisMaxYear, axisMinYear])
@@ -948,8 +961,8 @@ function App() {
     if (isSubTimeline || !displaySettings.showPeriodBands) {
       return []
     }
-    return PERIOD_BANDS.filter((item) => overlap(item.startYear, item.endYear, TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR))
-  }, [displaySettings.showPeriodBands, isSubTimeline])
+    return PERIOD_BANDS.filter((item) => overlap(item.startYear, item.endYear, axisMinYear, axisMaxYear))
+  }, [axisMaxYear, axisMinYear, displaySettings.showPeriodBands, isSubTimeline])
   const axisEndX = LABEL_WIDTH + totalYears * zoom
 
   const getXByYear = (year) => {
@@ -1188,6 +1201,13 @@ function App() {
     timelineViewportRef.current.scrollLeft = pendingScrollLeftRef.current
     pendingScrollLeftRef.current = null
   }, [zoom])
+
+  useEffect(() => {
+    if (isSubTimeline || !timelineViewportRef.current) {
+      return
+    }
+    timelineViewportRef.current.scrollLeft = 0
+  }, [axisMinYear, isSubTimeline])
 
   useEffect(() => {
     if (!timelineViewportRef.current) {
@@ -1997,6 +2017,14 @@ function App() {
                       <div
                         className="dynasty-track"
                         style={{ left: `${startX}px`, width: `${width}px` }}
+                        onDoubleClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setRulerContextMenu(null)
+                          setSelectedKey(row.key)
+                          setHighlightedRulerKey(null)
+                          zoomToRange(dynasty.startYear, dynasty.endYear)
+                        }}
                         onMouseEnter={(event) =>
                           showTooltip(event, dynasty.name, [
                             `区间：${formatPeriod(dynasty.startYear, dynasty.endYear)}`,
@@ -2087,6 +2115,14 @@ function App() {
                 const rulerEdgeStartX = typeof rulerEdgeStartYear === 'number' ? getXByYear(rulerEdgeStartYear) : 0
                 const rulerEdgeEndX = typeof rulerEdgeEndYear === 'number' ? getXByYear(rulerEdgeEndYear) : 0
                 const highlighted = row.key === highlightedRulerKey
+                const focusRulerTimeline = (event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setRulerContextMenu(null)
+                  setSelectedKey(row.key)
+                  setHighlightedRulerKey(row.key)
+                  zoomToRange(range.start, range.end)
+                }
 
                 return (
                   <div
@@ -2111,13 +2147,7 @@ function App() {
                   >
                     <div
                       className="name-slot ruler"
-                      onDoubleClick={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        setSelectedKey(row.key)
-                        setHighlightedRulerKey(row.key)
-                        zoomToRange(range.start, range.end)
-                      }}
+                      onDoubleClick={focusRulerTimeline}
                       title="双击缩放并高亮该人物时间段"
                     >
                       <strong>{ruler.name}</strong>
@@ -2147,6 +2177,7 @@ function App() {
                             }
                             onMouseMove={moveTooltip}
                             onMouseLeave={hideTooltip}
+                            onDoubleClick={focusRulerTimeline}
                           />
                         )
                         : (
@@ -2165,6 +2196,7 @@ function App() {
                             }
                             onMouseMove={moveTooltip}
                             onMouseLeave={hideTooltip}
+                            onDoubleClick={focusRulerTimeline}
                           />
                         )
                       : null}
@@ -2187,6 +2219,7 @@ function App() {
                           }
                           onMouseMove={moveTooltip}
                           onMouseLeave={hideTooltip}
+                          onDoubleClick={focusRulerTimeline}
                         />
                       ))
                       : null}
@@ -2209,6 +2242,7 @@ function App() {
                           }
                           onMouseMove={moveTooltip}
                           onMouseLeave={hideTooltip}
+                          onDoubleClick={focusRulerTimeline}
                         >
                           <span className="era-segment-text">
                             {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}
