@@ -37,6 +37,7 @@ const FIVE_DYNASTIES_TEN_KINGDOM_IDS = new Set([
   'ten-southern-han',
   'ten-northern-han'
 ])
+const TANG_MERGE_IDS = new Set(['tang', 'wu-zhou'])
 
 const PERIOD_BANDS = [
   { id: 'band-xia', label: '夏', startYear: -2070, endYear: -1600, color: '#8f6c49' },
@@ -553,6 +554,7 @@ function mergePeriodGroups(inputGroups) {
   const threeKingdomGroups = []
   const weiJinGroups = []
   const fiveDynGroups = []
+  const tangGroups = []
 
   inputGroups.forEach((group) => {
     if (group.category === '春秋战国') {
@@ -569,6 +571,10 @@ function mergePeriodGroups(inputGroups) {
     }
     if (FIVE_DYNASTIES_TEN_KINGDOM_IDS.has(group.id)) {
       fiveDynGroups.push(group)
+      return
+    }
+    if (TANG_MERGE_IDS.has(group.id)) {
+      tangGroups.push(group)
       return
     }
     normalGroups.push(group)
@@ -653,6 +659,24 @@ function mergePeriodGroups(inputGroups) {
       category: '隋唐五代十国',
       startYear: 907,
       endYear: 979,
+      rulers
+    })
+  }
+
+  if (tangGroups.length > 0) {
+    const startYear = Math.min(...tangGroups.map((group) => group.startYear))
+    const rulers = tangGroups
+      .flatMap((group) =>
+        group.rulers.map((ruler) => (group.id === 'wu-zhou' ? annotateRuler(ruler, group.name) : ruler))
+      )
+      .sort((a, b) => getRulerPoint(a, startYear) - getRulerPoint(b, startYear))
+
+    merged.push({
+      id: 'tang',
+      name: '唐',
+      category: '隋唐五代十国',
+      startYear,
+      endYear: Math.max(...tangGroups.map((group) => group.endYear)),
       rulers
     })
   }
@@ -762,15 +786,22 @@ function App() {
     })
   }, [])
 
-  const categories = useMemo(() => {
-    return [...new Set(sortedDynasties.map((item) => item.category))]
+  const allDynastyFilterIds = useMemo(() => sortedDynasties.map((item) => item.id), [sortedDynasties])
+  const totalRecordedRulerCount = useMemo(() => {
+    const uniqueRulerIds = new Set()
+    sortedDynasties.forEach((dynasty) => {
+      dynasty.rulers.forEach((ruler) => {
+        uniqueRulerIds.add(ruler.id)
+      })
+    })
+    return uniqueRulerIds.size
   }, [sortedDynasties])
 
   const [isDragging, setIsDragging] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [zoom, setZoom] = useState(DEFAULT_SCALE)
   const [yearWindow, setYearWindow] = useState([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
-  const [activeCategories, setActiveCategories] = useState(categories)
+  const [activeDynastyIds, setActiveDynastyIds] = useState(allDynastyFilterIds)
   const [expandedDynasties, setExpandedDynasties] = useState(new Set())
   const [selectedKey, setSelectedKey] = useState(`dynasty:${sortedDynasties[0]?.id ?? ''}`)
   const [tooltip, setTooltip] = useState(null)
@@ -787,7 +818,7 @@ function App() {
 
   const filteredDynasties = useMemo(() => {
     return sortedDynasties.reduce((result, dynasty) => {
-      if (!activeCategories.includes(dynasty.category)) {
+      if (!activeDynastyIds.includes(dynasty.id)) {
         return result
       }
       if (!overlap(dynasty.startYear, dynasty.endYear, windowStart, windowEnd)) {
@@ -821,7 +852,7 @@ function App() {
       })
       return result
     }, [])
-  }, [activeCategories, normalizedSearch, sortedDynasties, windowEnd, windowStart])
+  }, [activeDynastyIds, normalizedSearch, sortedDynasties, windowEnd, windowStart])
 
   const dynastyLookup = useMemo(() => {
     const map = new Map()
@@ -997,7 +1028,8 @@ function App() {
     }
     const scopeText = isSubTimeline ? `（子时间轴：${subTimelineDynasty.name}）` : ''
     const header = `时点：${formatYear(clampedProbeYear)}${scopeText}`
-    const summary = `在该时点存活君主：${probeRecords.length}位`
+    const reigningCount = probeRecords.reduce((count, item) => (item.isReigning ? count + 1 : count), 0)
+    const summary = `在该时点存活君主：${probeRecords.length}位；在位君主：${reigningCount}位`
     const rows = probeRecords.map((item, index) => {
       const ageText = typeof item.age === 'number' ? `${item.age}岁` : '年龄未知'
       const reignText = item.isReigning ? `在位第${item.reignYearsSoFar}年` : '未在位'
@@ -1007,6 +1039,10 @@ function App() {
     })
     return [header, summary, ...rows].join('\n')
   }, [clampedProbeYear, isSubTimeline, isYearProbeActive, probeRecords, subTimelineDynasty])
+  const probeReigningCount = useMemo(
+    () => probeRecords.reduce((count, item) => (item.isReigning ? count + 1 : count), 0),
+    [probeRecords]
+  )
 
   const handleCopyProbeReport = async () => {
     if (!probeReportText) {
@@ -1266,13 +1302,13 @@ function App() {
     event.stopPropagation()
   }
 
-  const toggleCategory = (category) => {
-    setActiveCategories((current) => {
-      if (current.includes(category)) {
-        const next = current.filter((item) => item !== category)
+  const toggleDynastyFilter = (dynastyId) => {
+    setActiveDynastyIds((current) => {
+      if (current.includes(dynastyId)) {
+        const next = current.filter((item) => item !== dynastyId)
         return next.length ? next : current
       }
-      return [...current, category]
+      return [...current, dynastyId]
     })
   }
 
@@ -1309,7 +1345,7 @@ function App() {
 
   const resetFilters = () => {
     setSearchText('')
-    setActiveCategories(categories)
+    setActiveDynastyIds(allDynastyFilterIds)
     setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
     setSubTimelineId(null)
     setZoom(DEFAULT_SCALE)
@@ -1441,6 +1477,7 @@ function App() {
         <h1>中国君主时间轴（按朝代可展开）</h1>
         <p>
           范围：{formatYear(axisMinYear)} 至 {formatYear(axisMaxYear)}。
+          全时期已记录君主 {totalRecordedRulerCount} 位。
           {isSubTimeline
             ? ` 当前为子时间轴：${subTimelineDynasty.name}。`
             : ` 当前显示${filteredDynasties.length}个朝代/政权（点击朝代行可展开或收起君主）。`}
@@ -1537,20 +1574,20 @@ function App() {
           </div>
 
           <div className="control-block wide">
-            <label>时代分类过滤（至少保留一项）</label>
+            <label>朝代过滤（至少保留一项）</label>
             <div className="dynasty-filter-row">
               <div className="dynasty-grid">
-                {categories.map((category) => {
-                  const active = activeCategories.includes(category)
+                {sortedDynasties.map((dynasty) => {
+                  const active = activeDynastyIds.includes(dynasty.id)
                   return (
                     <button
-                      key={category}
+                      key={dynasty.id}
                       className={`dynasty-chip ${active ? 'active' : ''}`}
-                      onClick={() => toggleCategory(category)}
+                      onClick={() => toggleDynastyFilter(dynasty.id)}
                       type="button"
                       aria-pressed={active}
                     >
-                      {category}
+                      {dynasty.name}
                     </button>
                   )
                 })}
@@ -1671,7 +1708,7 @@ function App() {
                     <div className="probe-float-head">
                       <div>
                         <strong>{formatYear(clampedProbeYear)}</strong>
-                        <span>存活 {probeRecords.length} 位</span>
+                        <span>存活 {probeRecords.length} 位 · 在位 {probeReigningCount} 位</span>
                       </div>
                       <div className="probe-head-actions">
                         <button className="secondary-btn probe-mini-btn" type="button" onClick={handleCopyProbeReport}>
@@ -1757,6 +1794,7 @@ function App() {
                   const endX = getXByYear(dynasty.endYear)
                   const width = Math.max(12, endX - startX)
                   const expanded = expandedDynasties.has(dynasty.id)
+                  const dynastyRulerCount = dynasty.rulers.length
 
                   return (
                     <div
@@ -1817,7 +1855,7 @@ function App() {
                           }}
                         >
                           <strong>{dynasty.name}</strong>
-                          <span className="meta">{dynasty.category}</span>
+                          <span className="meta">君主{dynastyRulerCount}位</span>
                           <span className="range">{formatPeriod(dynasty.startYear, dynasty.endYear)}</span>
                         </div>
                       </div>
@@ -1826,8 +1864,8 @@ function App() {
                         style={{ left: `${startX}px`, width: `${width}px` }}
                         onMouseEnter={(event) =>
                           showTooltip(event, dynasty.name, [
-                            `类别：${dynasty.category}`,
                             `区间：${formatPeriod(dynasty.startYear, dynasty.endYear)}`,
+                            `君主：${dynastyRulerCount}位`,
                             '点击可打开中文维基百科'
                           ])
                         }
