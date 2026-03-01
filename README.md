@@ -1,16 +1,94 @@
-# React + Vite
+# 中国君主时间轴（-2100 ~ 1920）
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+交互式展示中国历史主要朝代/政权君主的生卒、在位与年号信息，支持主时间轴与子时间轴切换、分期背景色带、时点光轴分析、右键维基跳转等功能。
 
-Currently, two official plugins are available:
+## 在线访问
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- GitHub Pages: https://txc-alon.github.io/TimeLine/
 
-## React Compiler
+## 当前版本功能
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 时间轴范围：公元前 2100 年至公元 1920 年。
+- 左右分区交互：
+  - 左侧朝代区：滚轮触发页面纵向滚动
+  - 右侧时间轴区：滚轮用于缩放
+- 君主/朝代轨道展示：
+  - 生卒时间轴
+  - 在位时间轴（含在位年数）
+  - 年号分段时间轴（默认不显示，可悬浮查看完整信息）
+- 子时间轴：
+  - 双击朝代名称进入子时间轴
+  - 使用浏览器前进/后退在主轴与子轴间切换（URL 带 `?sub=...`）
+- 聚焦与高亮：
+  - 双击君主行或其轨道可高亮并聚焦该君主时间段
+  - 双击朝代轨道可按该朝代区间自适应缩放
+- 时点光轴：
+  - 可拖动光轴查看某一年“存活/在位君主”
+  - 显示年龄、在位年数、当年年号
+  - 支持复制时点报告
+- 详情与外链：
+  - Hover 显示详细 tooltip（可在 Settings 关闭）
+  - 朝代/君主右键菜单可跳转中文维基百科
+- 设置面板（弹窗）：
+  - 控制主轴/朝代/君主首尾年份显示
+  - 控制生卒/在位/年号轨道显示
+  - 控制刻度线、背景色带、tooltip 等
+- 筛选与检索：
+  - 搜索（朝代/君主/年号）
+  - 朝代过滤（至少保留一项）
+  - 双端单轨时间段控制（总范围固定 -2100~1920）
+  - 默认隐藏：夏、商、西周、春秋、战国（可手动开启）
 
-## Expanding the ESLint configuration
+## 数据说明
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- 数据源文件：`src/data/timelineData.js`
+- 全时期统计由程序按唯一君主 ID 动态计算并显示在页面标题
+- 年号支持单君主多段，显示为独立分段条
+
+## 本地开发
+
+### 环境要求
+
+- Node.js 20+
+- npm 10+
+
+### 运行命令
+
+```bash
+npm ci
+npm run dev
+```
+
+### 质量检查
+
+```bash
+npm run lint
+npm run build
+```
+
+## 部署（GitHub Pages）
+
+项目已配置 GitHub Actions 自动部署：
+
+- 工作流：`.github/workflows/deploy-pages.yml`
+- 构建输出：`dist/`
+- `vite.config.js` 已根据 `GITHUB_REPOSITORY` 自动设置 `base`，兼容项目页路径 `/TimeLine/`
+
+如需重新配置，请在仓库 `Settings -> Pages` 中将 Source 设为 `GitHub Actions`。
+
+## 技术文档
+
+- 详细实现步骤、依赖与技术细节见：
+  - `docs/TECHNICAL_SUMMARY.md`
+
+## 感想
+Codex VibeCoding一天，完成这个网页，我一行代码没写，功能基本满意
+
+感觉Codex有几个点特别强，
+1. 连续上下文,以及长时间开发过程中的一致性
+2. 理解力很强，智能补充和优化细节。
+   1. 比如说我这次是开发一个君主时间轴，那么他设计的网页颜色和字体就很古典，也知道默认把时间轴设置成不同颜色
+   2. 在“开发过程中”，我只需要简单提一下改进意见，Codex 就能快速理解并执行。而且它会注意到一些我自己都没想到的细节。比如我提到做一个朝代过滤和主时间轴联动的功能时，Codex 不仅实现了这个功能，还考虑到了一个非常细节的问题：如果明朝被隐藏，而清朝存在，那么它只会隐藏明朝的时间轴，明朝的背景时间段仍然保留，从而避免了元朝和清朝的时间轴直接接在一起。
+3. 项目完整性和组织能力强。   
+   
+我也是试着用claude+MiniMax2.5做同样的功能，实现以及交互上差挺多的。感觉目前的Code模型差距还是有些大，期待一下DeepSeekV4吧。

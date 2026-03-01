@@ -1595,18 +1595,23 @@ function App() {
     if (!rulerContextMenu) {
       return undefined
     }
-    const closeMenu = () => setRulerContextMenu(null)
+    const closeMenu = (event) => {
+      if (event?.target instanceof Element && event.target.closest('.ruler-context-menu')) {
+        return
+      }
+      setRulerContextMenu(null)
+    }
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setRulerContextMenu(null)
       }
     }
-    window.addEventListener('pointerdown', closeMenu)
+    window.addEventListener('pointerdown', closeMenu, true)
     window.addEventListener('resize', closeMenu)
     window.addEventListener('scroll', closeMenu, true)
     window.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.removeEventListener('pointerdown', closeMenu)
+      window.removeEventListener('pointerdown', closeMenu, true)
       window.removeEventListener('resize', closeMenu)
       window.removeEventListener('scroll', closeMenu, true)
       window.removeEventListener('keydown', handleKeyDown)
@@ -1662,7 +1667,7 @@ function App() {
     <div className="app-shell">
       <header className="hero">
         <p className="eyebrow">Imperial Timeline</p>
-        <h1>中国君主时间轴（按朝代可展开）</h1>
+        <h1>中国君主时间轴</h1>
         <p>
           范围：{formatYear(axisMinYear)} 至 {formatYear(axisMaxYear)}。
           全时期已记录君主 {totalRecordedRulerCount} 位。
@@ -2254,12 +2259,12 @@ function App() {
                           onMouseEnter={(event) =>
                             showTooltip(event, `${ruler.name}在位时间`, [
                               `所属：${dynasty.name}`,
-                                ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                                `在位分段：${formatPeriod(period.start, period.end)}`,
-                                formatReignText(ruler, dynasty),
-                                formatEraText(ruler, dynasty),
-                                '右键菜单可打开中文维基百科'
-                              ].filter(Boolean))
+                              ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                              `在位分段：${formatPeriod(period.start, period.end)}`,
+                              formatReignText(ruler, dynasty),
+                              formatEraText(ruler, dynasty),
+                              '右键菜单可打开中文维基百科'
+                            ].filter(Boolean))
                           }
                           onMouseMove={moveTooltip}
                           onMouseLeave={hideTooltip}
