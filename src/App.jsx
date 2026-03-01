@@ -46,6 +46,14 @@ const FIVE_DYNASTIES_TEN_KINGDOM_IDS = new Set([
 ])
 const TANG_MERGE_IDS = new Set(['tang', 'wu-zhou'])
 
+const DEFAULT_HIDDEN_DYNASTY_IDS = new Set([
+  'xia',
+  'shang',
+  'western-zhou',
+  'period-spring-autumn',
+  'period-warring-states'
+])
+
 const PERIOD_BANDS = [
   { id: 'band-xia', label: '夏', startYear: -2070, endYear: -1600, color: '#8f6c49' },
   { id: 'band-shang', label: '商', startYear: -1600, endYear: -1046, color: '#7c5a3f' },
@@ -741,6 +749,20 @@ function getDynastyLifeBounds(dynasty) {
   return { start, end }
 }
 
+function getMainTimelineBoundsByDynastyIds(dynasties, activeIds) {
+  const activeDynasties = dynasties.filter((item) => activeIds.includes(item.id))
+  if (activeDynasties.length === 0) {
+    return {
+      start: TIMELINE_MIN_YEAR,
+      end: TIMELINE_MAX_YEAR
+    }
+  }
+  return {
+    start: Math.min(...activeDynasties.map((item) => item.startYear)),
+    end: Math.max(...activeDynasties.map((item) => item.endYear))
+  }
+}
+
 function getInitialProbeYearByDynasties(dynasties, minYear, maxYear) {
   const firstDynastyWithRuler = dynasties.find((item) => item.visibleRulers?.length > 0)
   if (!firstDynastyWithRuler) {
@@ -794,7 +816,10 @@ function App() {
     })
   }, [])
 
-  const allDynastyFilterIds = useMemo(() => sortedDynasties.map((item) => item.id), [sortedDynasties])
+  const defaultDynastyFilterIds = useMemo(
+    () => sortedDynasties.map((item) => item.id).filter((id) => !DEFAULT_HIDDEN_DYNASTY_IDS.has(id)),
+    [sortedDynasties]
+  )
   const totalRecordedRulerCount = useMemo(() => {
     const uniqueRulerIds = new Set()
     sortedDynasties.forEach((dynasty) => {
@@ -808,8 +833,11 @@ function App() {
   const [isDragging, setIsDragging] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [zoom, setZoom] = useState(DEFAULT_SCALE)
-  const [yearWindow, setYearWindow] = useState([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
-  const [activeDynastyIds, setActiveDynastyIds] = useState(allDynastyFilterIds)
+  const [activeDynastyIds, setActiveDynastyIds] = useState(defaultDynastyFilterIds)
+  const [yearWindow, setYearWindow] = useState(() => {
+    const initialBounds = getMainTimelineBoundsByDynastyIds(sortedDynasties, defaultDynastyFilterIds)
+    return [initialBounds.start, initialBounds.end]
+  })
   const [expandedDynasties, setExpandedDynasties] = useState(new Set())
   const [selectedKey, setSelectedKey] = useState(`dynasty:${sortedDynasties[0]?.id ?? ''}`)
   const [tooltip, setTooltip] = useState(null)
@@ -824,6 +852,7 @@ function App() {
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
+  const totalTimelineSpan = Math.max(1, TIMELINE_MAX_YEAR - TIMELINE_MIN_YEAR)
 
   const filteredDynasties = useMemo(() => {
     return sortedDynasties.reduce((result, dynasty) => {
@@ -877,19 +906,14 @@ function App() {
     }
     return getDynastyLifeBounds(subTimelineDynasty)
   }, [subTimelineDynasty])
-  const mainTimelineBounds = useMemo(() => {
-    const activeDynasties = sortedDynasties.filter((item) => activeDynastyIds.includes(item.id))
-    if (activeDynasties.length === 0) {
-      return {
-        start: TIMELINE_MIN_YEAR,
-        end: TIMELINE_MAX_YEAR
-      }
-    }
-    return {
-      start: Math.min(...activeDynasties.map((item) => item.startYear)),
-      end: Math.max(...activeDynasties.map((item) => item.endYear))
-    }
-  }, [activeDynastyIds, sortedDynasties])
+  const mainTimelineBounds = useMemo(
+    () => getMainTimelineBoundsByDynastyIds(sortedDynasties, activeDynastyIds),
+    [activeDynastyIds, sortedDynasties]
+  )
+  const currentDisplayedRulerCount = useMemo(
+    () => filteredDynasties.reduce((sum, dynasty) => sum + dynasty.visibleRulers.length, 0),
+    [filteredDynasties]
+  )
 
   const displayDynasties = useMemo(() => {
     if (!subTimelineDynasty) {
@@ -964,6 +988,8 @@ function App() {
     return PERIOD_BANDS.filter((item) => overlap(item.startYear, item.endYear, axisMinYear, axisMaxYear))
   }, [axisMaxYear, axisMinYear, displaySettings.showPeriodBands, isSubTimeline])
   const axisEndX = LABEL_WIDTH + totalYears * zoom
+  const windowStartPercent = ((windowStart - TIMELINE_MIN_YEAR) / totalTimelineSpan) * 100
+  const windowEndPercent = ((windowEnd - TIMELINE_MIN_YEAR) / totalTimelineSpan) * 100
 
   const getXByYear = (year) => {
     const clampedYear = clamp(year, axisMinYear, axisMaxYear)
@@ -1391,9 +1417,25 @@ function App() {
     setActiveDynastyIds((current) => {
       if (current.includes(dynastyId)) {
         const next = current.filter((item) => item !== dynastyId)
-        return next.length ? next : current
+        if (!next.length) {
+          return current
+        }
+        const nextBounds = getMainTimelineBoundsByDynastyIds(sortedDynasties, next)
+        setYearWindow((currentWindow) =>
+          currentWindow[0] === nextBounds.start && currentWindow[1] === nextBounds.end
+            ? currentWindow
+            : [nextBounds.start, nextBounds.end]
+        )
+        return next
       }
-      return [...current, dynastyId]
+      const next = [...current, dynastyId]
+      const nextBounds = getMainTimelineBoundsByDynastyIds(sortedDynasties, next)
+      setYearWindow((currentWindow) =>
+        currentWindow[0] === nextBounds.start && currentWindow[1] === nextBounds.end
+          ? currentWindow
+          : [nextBounds.start, nextBounds.end]
+      )
+      return next
     })
   }
 
@@ -1431,21 +1473,13 @@ function App() {
   const resetFilters = () => {
     setRulerContextMenu(null)
     setSearchText('')
-    setActiveDynastyIds(allDynastyFilterIds)
-    setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
+    setActiveDynastyIds(defaultDynastyFilterIds)
+    const nextBounds = getMainTimelineBoundsByDynastyIds(sortedDynasties, defaultDynastyFilterIds)
+    setYearWindow([nextBounds.start, nextBounds.end])
     setSubTimelineId(null)
     syncTimelineHistory(null, 'replace')
     setZoom(DEFAULT_SCALE)
     setHighlightedRulerKey(null)
-  }
-
-  const resetView = () => {
-    if (timelineViewportRef.current && Math.abs(zoom - DEFAULT_SCALE) < 0.0001) {
-      timelineViewportRef.current.scrollLeft = 0
-      return
-    }
-    pendingScrollLeftRef.current = 0
-    setZoom(DEFAULT_SCALE)
   }
 
   const fitViewToCurrentRange = () => {
@@ -1634,17 +1668,17 @@ function App() {
           全时期已记录君主 {totalRecordedRulerCount} 位。
           {isSubTimeline
             ? ` 当前为子时间轴：${subTimelineDynasty.name}。`
-            : ` 当前显示${filteredDynasties.length}个朝代/政权（点击朝代行可展开或收起君主）。`}
+            : ` 当前显示${filteredDynasties.length}个朝代/政权、${currentDisplayedRulerCount}位君主（点击朝代行可展开或收起君主）。`}
         </p>
       </header>
 
       <section className="control-panel">
+        <div className="control-head">
+          <h2>控制菜单</h2>
+        </div>
         <div className="quick-actions">
-          <button className="secondary-btn quick-btn" type="button" onClick={resetView}>
-            重置视图
-          </button>
           <button className="secondary-btn quick-btn" type="button" onClick={fitViewToCurrentRange}>
-            适应视图缩放
+            适应缩放
           </button>
           <button
             className={`secondary-btn quick-btn ${isYearProbeActive ? 'active' : ''}`}
@@ -1663,11 +1697,6 @@ function App() {
           >
             时点光轴
           </button>
-          {isSubTimeline ? (
-            <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
-              退出子时间轴
-            </button>
-          ) : null}
           <button className="secondary-btn" type="button" onClick={expandAllFiltered}>
             全部展开
           </button>
@@ -1681,7 +1710,7 @@ function App() {
 
         <div className="primary-controls">
           <div className="control-block">
-            <label htmlFor="search-input">搜索（朝代 / 君主 / 名号）</label>
+            <label htmlFor="search-input">搜索</label>
             <input
               id="search-input"
               type="text"
@@ -1692,7 +1721,7 @@ function App() {
           </div>
 
           <div className="control-block">
-            <label htmlFor="zoom-range">时间轴缩放（每年像素）: {zoom.toFixed(2)}</label>
+            <label htmlFor="zoom-range">缩放: {zoom.toFixed(2)}</label>
             <input
               id="zoom-range"
               type="range"
@@ -1705,30 +1734,45 @@ function App() {
           </div>
 
           <div className="control-block">
-            <label htmlFor="window-start">时间段过滤</label>
+            <label htmlFor="window-start">时间段</label>
             <div className="range-labels">
               <span>{formatYear(windowStart)}</span>
               <span>{formatYear(windowEnd)}</span>
             </div>
-            <input
-              id="window-start"
-              type="range"
-              min={TIMELINE_MIN_YEAR}
-              max={TIMELINE_MAX_YEAR}
-              value={windowStart}
-              onChange={(event) => handleWindowStartChange(event.target.value)}
-            />
-            <input
-              type="range"
-              min={TIMELINE_MIN_YEAR}
-              max={TIMELINE_MAX_YEAR}
-              value={windowEnd}
-              onChange={(event) => handleWindowEndChange(event.target.value)}
-            />
+            <div className="range-slider-dual">
+              <div className="range-slider-track" />
+              <div
+                className="range-slider-active"
+                style={{
+                  left: `${windowStartPercent}%`,
+                  width: `${Math.max(0, windowEndPercent - windowStartPercent)}%`
+                }}
+              />
+              <input
+                id="window-start"
+                className="range-slider-thumb range-slider-thumb-start"
+                type="range"
+                min={TIMELINE_MIN_YEAR}
+                max={TIMELINE_MAX_YEAR}
+                value={windowStart}
+                onChange={(event) => handleWindowStartChange(event.target.value)}
+              />
+              <input
+                className="range-slider-thumb range-slider-thumb-end"
+                type="range"
+                min={TIMELINE_MIN_YEAR}
+                max={TIMELINE_MAX_YEAR}
+                value={windowEnd}
+                onChange={(event) => handleWindowEndChange(event.target.value)}
+              />
+            </div>
+            <div className="range-hint">
+              主轴范围：{formatYear(mainTimelineBounds.start)} - {formatYear(mainTimelineBounds.end)}
+            </div>
           </div>
 
           <div className="control-block wide">
-            <label>朝代过滤（至少保留一项）</label>
+            <label>朝代过滤</label>
             <div className="dynasty-filter-row">
               <div className="dynasty-grid">
                 {sortedDynasties.map((dynasty) => {
