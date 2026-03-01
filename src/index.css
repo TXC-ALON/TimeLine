@@ -427,6 +427,9 @@ input[type='range'] {
 }
 
 .timeline-viewport {
+  position: relative;
+  --label-width: 280px;
+  --split-offset: 0px;
   margin: 0.76rem;
   border: 1px solid #d6c4a5;
   border-radius: 12px;
@@ -437,6 +440,31 @@ input[type='range'] {
     #f9f4e7;
   cursor: grab;
   touch-action: pan-y;
+}
+
+.timeline-left-pane-mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--label-width);
+  z-index: 11;
+  pointer-events: none;
+  transform: translateX(var(--split-offset));
+  background: linear-gradient(90deg, #fbf6ea 0%, #fbf6ea 78%, #f7f1e4 100%);
+}
+
+.timeline-left-pane-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--label-width);
+  width: 1px;
+  z-index: 13;
+  pointer-events: none;
+  transform: translateX(var(--split-offset));
+  background: rgba(146, 116, 84, 0.5);
+  box-shadow: 1px 0 0 rgba(255, 248, 234, 0.85);
 }
 
 .timeline-viewport.dragging {
@@ -586,14 +614,14 @@ input[type='range'] {
 .name-slot {
   position: sticky;
   left: 8px;
-  z-index: 2;
+  z-index: 12;
   width: 248px;
   min-height: 38px;
   border-radius: 8px;
   padding: 5px 8px;
   display: grid;
   align-content: center;
-  background: linear-gradient(90deg, rgba(255, 250, 239, 0.95), rgba(255, 250, 239, 0.22));
+  background: linear-gradient(90deg, #fffaf0 0%, #fff8eb 72%, #fff4e4 100%);
   cursor: pointer;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dynasty, convertYear } from 'cn-era'
 import { TIMELINE_MAX_YEAR, TIMELINE_MIN_YEAR, dynastyGroups } from './data/timelineData'
 
@@ -14,6 +14,7 @@ const WHEEL_ZOOM_FACTOR = 1.12
 const PROBE_CARD_WIDTH = 320
 const PROBE_CARD_GAP = 14
 const PROBE_CARD_MARGIN = 12
+const PROBE_INITIAL_FALLBACK_OFFSET = 1
 const SPRING_AUTUMN_END = -476
 const WARRING_STATES_START = -475
 
@@ -709,6 +710,19 @@ function getDynastyLifeBounds(dynasty) {
   return { start, end }
 }
 
+function getInitialProbeYearByDynasties(dynasties, minYear, maxYear) {
+  const firstDynastyWithRuler = dynasties.find((item) => item.visibleRulers?.length > 0)
+  if (!firstDynastyWithRuler) {
+    return clamp(minYear + PROBE_INITIAL_FALLBACK_OFFSET, minYear, maxYear)
+  }
+  const firstRuler = firstDynastyWithRuler.visibleRulers[0]
+  if (typeof firstRuler.birthYear === 'number') {
+    return clamp(firstRuler.birthYear, minYear, maxYear)
+  }
+  const range = getRulerRange(firstRuler, firstDynastyWithRuler)
+  return clamp(range.start + PROBE_INITIAL_FALLBACK_OFFSET, minYear, maxYear)
+}
+
 function getTickStep(spanYears) {
   const targetTicks = 10
   const rough = Math.max(1, spanYears / targetTicks)
@@ -736,6 +750,7 @@ function App() {
   const dragStateRef = useRef({ active: false, startX: 0, startScrollLeft: 0 })
   const probeAxisDragRef = useRef({ active: false, pointerId: null })
   const pendingScrollLeftRef = useRef(null)
+  const pendingProbeRelocationRef = useRef(null)
 
   const sortedDynasties = useMemo(() => {
     const merged = mergePeriodGroups(dynastyGroups)
@@ -901,6 +916,9 @@ function App() {
     const clampedYear = clamp(year, axisMinYear, axisMaxYear)
     return LABEL_WIDTH + (clampedYear - axisMinYear) * zoom
   }
+  const probeInitialYear = useMemo(() => {
+    return getInitialProbeYearByDynasties(displayDynasties, axisMinYear, axisMaxYear)
+  }, [axisMaxYear, axisMinYear, displayDynasties])
   const clampedProbeYear = clamp(Math.round(probeYear), axisMinYear, axisMaxYear)
 
   const probeRecords = useMemo(() => {
@@ -1036,6 +1054,14 @@ function App() {
 
   const enterSubTimeline = (dynasty) => {
     const bounds = getDynastyLifeBounds(dynasty)
+    const sortedRulers = [...dynasty.rulers].sort(
+      (a, b) => getRulerPoint(a, dynasty.startYear) - getRulerPoint(b, dynasty.startYear)
+    )
+    const nextProbeYear = getInitialProbeYearByDynasties(
+      [{ ...dynasty, visibleRulers: sortedRulers }],
+      bounds.start,
+      bounds.end
+    )
     setSubTimelineId(dynasty.id)
     setSelectedKey(`dynasty:${dynasty.id}`)
     setExpandedDynasties((current) => {
@@ -1043,6 +1069,10 @@ function App() {
       next.add(dynasty.id)
       return next
     })
+    if (isYearProbeActive) {
+      pendingProbeRelocationRef.current = nextProbeYear
+      setProbeYear(nextProbeYear)
+    }
 
     if (timelineViewportRef.current) {
       const viewport = timelineViewportRef.current
@@ -1075,6 +1105,22 @@ function App() {
     timelineViewportRef.current.scrollLeft = pendingScrollLeftRef.current
     pendingScrollLeftRef.current = null
   }, [zoom])
+
+  useEffect(() => {
+    if (!timelineViewportRef.current) {
+      return undefined
+    }
+    const viewport = timelineViewportRef.current
+    const syncSplitOffset = () => {
+      viewport.style.setProperty('--split-offset', `${viewport.scrollLeft}px`)
+    }
+
+    syncSplitOffset()
+    viewport.addEventListener('scroll', syncSplitOffset, { passive: true })
+    return () => {
+      viewport.removeEventListener('scroll', syncSplitOffset)
+    }
+  }, [])
 
   const openWiki = (subject) => {
     window.open(buildWikiUrl(subject), '_blank', 'noopener,noreferrer')
@@ -1121,12 +1167,13 @@ function App() {
     setYearWindow(([start]) => [start, Math.max(nextEnd, start)])
   }
 
-  const ensureProbeCardRoom = (targetYear) => {
+  const ensureProbeCardRoom = useCallback((targetYear) => {
     if (!timelineViewportRef.current) {
       return
     }
     const viewport = timelineViewportRef.current
-    const axisX = getXByYear(targetYear)
+    const clampedYear = clamp(targetYear, axisMinYear, axisMaxYear)
+    const axisX = LABEL_WIDTH + (clampedYear - axisMinYear) * zoom
     const cardLeft = axisX + PROBE_CARD_GAP
     const neededRight = cardLeft + PROBE_CARD_WIDTH + PROBE_CARD_MARGIN
     const maxScrollLeft = Math.max(0, timelineWidth - viewport.clientWidth)
@@ -1144,7 +1191,21 @@ function App() {
     if (Math.abs(nextScrollLeft - viewport.scrollLeft) > 1) {
       viewport.scrollLeft = nextScrollLeft
     }
-  }
+  }, [axisMaxYear, axisMinYear, timelineWidth, zoom])
+
+  useEffect(() => {
+    if (!isYearProbeActive || pendingProbeRelocationRef.current === null) {
+      return
+    }
+    const targetYear = clamp(
+      pendingProbeRelocationRef.current,
+      axisMinYear,
+      axisMaxYear
+    )
+    pendingProbeRelocationRef.current = null
+    setProbeYear(targetYear)
+    window.setTimeout(() => ensureProbeCardRoom(targetYear), 0)
+  }, [axisMaxYear, axisMinYear, ensureProbeCardRoom, isYearProbeActive, zoom])
 
   const updateProbeYear = (nextYear, ensureCardRoom = false) => {
     if (!Number.isFinite(nextYear)) {
@@ -1325,11 +1386,24 @@ function App() {
     }
     const viewport = timelineViewportRef.current
     const handleWheel = (event) => {
+      const rect = viewport.getBoundingClientRect()
+      const pointerX = event.clientX - rect.left
+
+      // 左侧朝代区滚轮用于页面纵向滚动；右侧时间轴区滚轮用于缩放。
+      if (pointerX <= LABEL_WIDTH) {
+        event.preventDefault()
+        event.stopPropagation()
+        window.scrollBy({
+          top: event.deltaY,
+          left: 0,
+          behavior: 'auto'
+        })
+        return
+      }
+
       event.preventDefault()
       event.stopPropagation()
 
-      const rect = viewport.getBoundingClientRect()
-      const pointerX = event.clientX - rect.left
       const yearAtPointer = axisMinYear + (viewport.scrollLeft + pointerX - LABEL_WIDTH) / zoom
       const factor = event.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR
 
@@ -1390,8 +1464,10 @@ function App() {
                 setIsYearProbeActive(false)
                 return
               }
+              const nextProbeYear = probeInitialYear
+              setProbeYear(nextProbeYear)
               setIsYearProbeActive(true)
-              window.setTimeout(() => ensureProbeCardRoom(clampedProbeYear), 0)
+              window.setTimeout(() => ensureProbeCardRoom(nextProbeYear), 0)
             }}
           >
             时点光轴
@@ -1533,12 +1609,13 @@ function App() {
         <article className="timeline-card">
           <div className="timeline-head">
             <h2>时间轴视图</h2>
-            <p>拖动空白区域可横向平移，滚轮可缩放。点击朝代行仅选中，点箭头折叠/展开，双击名称进入子时间轴。</p>
+            <p>左侧朝代区滚轮可纵向滚动页面，右侧时间轴区滚轮可缩放。拖动空白区域可横向平移，双击名称进入子时间轴。</p>
           </div>
 
           <div
             ref={timelineViewportRef}
             className={`timeline-viewport ${isDragging ? 'dragging' : ''}`}
+            style={{ '--label-width': `${LABEL_WIDTH}px` }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={stopDragging}
@@ -1546,6 +1623,8 @@ function App() {
             onPointerLeave={stopDragging}
             onMouseLeave={hideTooltip}
           >
+            <div className="timeline-left-pane-mask" aria-hidden="true" />
+            <div className="timeline-left-pane-divider" aria-hidden="true" />
             <div className="timeline-stage" style={{ width: `${timelineWidth}px`, height: `${timelineRows.height}px` }}>
               {periodBands.map((item) => {
                 const startX = getXByYear(item.startYear)
