@@ -920,6 +920,39 @@ input[type='range'] {
   color: #4f473f;
 }
 
+.ruler-context-menu {
+  position: fixed;
+  z-index: 34;
+  min-width: 210px;
+  padding: 0.24rem;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 99, 70, 0.38);
+  background: rgba(255, 251, 243, 0.98);
+  box-shadow: 0 12px 26px rgba(62, 42, 28, 0.24);
+}
+
+.ruler-context-menu-item {
+  width: 100%;
+  border: 1px solid rgba(170, 135, 101, 0.45);
+  border-radius: 8px;
+  background: #fff7e9;
+  color: #4a3a2d;
+  padding: 0.42rem 0.56rem;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ruler-context-menu-item:hover {
+  background: #fff0d8;
+  border-color: rgba(145, 91, 58, 0.5);
+}
+
+.ruler-context-menu-item:focus-visible {
+  outline: 2px solid rgba(147, 78, 48, 0.35);
+  outline-offset: 1px;
+}
+
 @media (max-width: 700px) {
   .app-shell {
     width: calc(100% - 0.9rem);

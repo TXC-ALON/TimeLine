@@ -19,6 +19,9 @@ const SUB_TIMELINE_QUERY_KEY = 'sub'
 const TIMELINE_HISTORY_VIEW_KEY = 'timelineView'
 const TIMELINE_HISTORY_MAIN = 'main'
 const TIMELINE_HISTORY_SUB = 'sub'
+const RULER_CONTEXT_MENU_WIDTH = 210
+const RULER_CONTEXT_MENU_HEIGHT = 42
+const RULER_CONTEXT_MENU_PADDING = 8
 const SPRING_AUTUMN_END = -476
 const WARRING_STATES_START = -475
 
@@ -817,6 +820,7 @@ function App() {
   const [isYearProbeActive, setIsYearProbeActive] = useState(false)
   const [probeYear, setProbeYear] = useState(TIMELINE_MIN_YEAR)
   const [probeCopyStatus, setProbeCopyStatus] = useState('')
+  const [rulerContextMenu, setRulerContextMenu] = useState(null)
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -1120,6 +1124,7 @@ function App() {
 
   const enterSubTimeline = useCallback((dynasty, options = {}) => {
     const { syncHistory = true, historyMode = 'push' } = options
+    setRulerContextMenu(null)
     const bounds = getDynastyLifeBounds(dynasty)
     const sortedRulers = [...dynasty.rulers].sort(
       (a, b) => getRulerPoint(a, dynasty.startYear) - getRulerPoint(b, dynasty.startYear)
@@ -1160,6 +1165,7 @@ function App() {
 
   const exitSubTimeline = useCallback((options = {}) => {
     const { syncHistory = true, historyMode = 'push' } = options
+    setRulerContextMenu(null)
     setSubTimelineId(null)
     if (timelineViewportRef.current && Math.abs(zoom - DEFAULT_SCALE) < 0.0001) {
       timelineViewportRef.current.scrollLeft = 0
@@ -1232,6 +1238,24 @@ function App() {
 
   const hideTooltip = () => {
     setTooltip(null)
+  }
+
+  const openWikiContextMenu = (event, rowKey, subjectName) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setTooltip(null)
+    setSelectedKey(rowKey)
+    const x = clamp(
+      event.clientX,
+      RULER_CONTEXT_MENU_PADDING,
+      window.innerWidth - RULER_CONTEXT_MENU_WIDTH - RULER_CONTEXT_MENU_PADDING
+    )
+    const y = clamp(
+      event.clientY,
+      RULER_CONTEXT_MENU_PADDING,
+      window.innerHeight - RULER_CONTEXT_MENU_HEIGHT - RULER_CONTEXT_MENU_PADDING
+    )
+    setRulerContextMenu({ x, y, subjectName })
   }
 
   const handleWindowStartChange = (value) => {
@@ -1385,6 +1409,7 @@ function App() {
   }
 
   const resetFilters = () => {
+    setRulerContextMenu(null)
     setSearchText('')
     setActiveDynastyIds(allDynastyFilterIds)
     setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
@@ -1511,6 +1536,28 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isSettingsOpen])
+
+  useEffect(() => {
+    if (!rulerContextMenu) {
+      return undefined
+    }
+    const closeMenu = () => setRulerContextMenu(null)
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setRulerContextMenu(null)
+      }
+    }
+    window.addEventListener('pointerdown', closeMenu)
+    window.addEventListener('resize', closeMenu)
+    window.addEventListener('scroll', closeMenu, true)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', closeMenu)
+      window.removeEventListener('resize', closeMenu)
+      window.removeEventListener('scroll', closeMenu, true)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [rulerContextMenu])
 
   useEffect(() => {
     if (historyInitializedRef.current) {
@@ -1894,6 +1941,7 @@ function App() {
                       }}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={() => setSelectedKey(row.key)}
+                      onContextMenu={(event) => openWikiContextMenu(event, row.key, dynasty.name)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
@@ -1953,15 +2001,11 @@ function App() {
                           showTooltip(event, dynasty.name, [
                             `区间：${formatPeriod(dynasty.startYear, dynasty.endYear)}`,
                             `君主：${dynastyRulerCount}位`,
-                            '点击可打开中文维基百科'
+                            '右键菜单可打开中文维基百科'
                           ])
                         }
                         onMouseMove={moveTooltip}
                         onMouseLeave={hideTooltip}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openWiki(dynasty.name)
-                        }}
                       />
                       {displaySettings.showDynastyTrackEdgeYears ? (
                         <>
@@ -2055,6 +2099,7 @@ function App() {
                     }}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={() => setSelectedKey(row.key)}
+                    onContextMenu={(event) => openWikiContextMenu(event, row.key, ruler.name)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
@@ -2097,15 +2142,11 @@ function App() {
                                 formatLifeText(ruler),
                                 formatReignText(ruler, dynasty),
                                 formatEraText(ruler, dynasty),
-                                '点击可打开中文维基百科'
+                                '右键菜单可打开中文维基百科'
                               ].filter(Boolean))
                             }
                             onMouseMove={moveTooltip}
                             onMouseLeave={hideTooltip}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openWiki(ruler.name)
-                            }}
                           />
                         )
                         : (
@@ -2119,15 +2160,11 @@ function App() {
                                 `区间：${formatPeriod(range.start, range.end)}`,
                                 formatReignText(ruler, dynasty),
                                 formatEraText(ruler, dynasty),
-                                '点击可打开中文维基百科'
+                                '右键菜单可打开中文维基百科'
                               ].filter(Boolean))
                             }
                             onMouseMove={moveTooltip}
                             onMouseLeave={hideTooltip}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openWiki(ruler.name)
-                            }}
                           />
                         )
                       : null}
@@ -2141,19 +2178,15 @@ function App() {
                           onMouseEnter={(event) =>
                             showTooltip(event, `${ruler.name}在位时间`, [
                               `所属：${dynasty.name}`,
-                              ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
-                              `在位分段：${formatPeriod(period.start, period.end)}`,
-                              formatReignText(ruler, dynasty),
-                              formatEraText(ruler, dynasty),
-                              '点击可打开中文维基百科'
-                            ].filter(Boolean))
+                                ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
+                                `在位分段：${formatPeriod(period.start, period.end)}`,
+                                formatReignText(ruler, dynasty),
+                                formatEraText(ruler, dynasty),
+                                '右键菜单可打开中文维基百科'
+                              ].filter(Boolean))
                           }
                           onMouseMove={moveTooltip}
                           onMouseLeave={hideTooltip}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openWiki(ruler.name)
-                          }}
                         />
                       ))
                       : null}
@@ -2171,15 +2204,11 @@ function App() {
                               ruler.sourcePolity ? `政权：${ruler.sourcePolity}` : null,
                               `年号：${period.name}`,
                               `区间：${formatPeriod(period.start, period.end)}`,
-                              '点击可打开中文维基百科'
+                              '右键菜单可打开中文维基百科'
                             ].filter(Boolean))
                           }
                           onMouseMove={moveTooltip}
                           onMouseLeave={hideTooltip}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openWiki(ruler.name)
-                          }}
                         >
                           <span className="era-segment-text">
                             {period.name} {formatAxisYear(period.start)}-{formatAxisYear(period.end)}
@@ -2272,6 +2301,26 @@ function App() {
           {tooltip.lines.map((line, index) => (
             <span key={index}>{line}</span>
           ))}
+        </div>
+      ) : null}
+      {rulerContextMenu ? (
+        <div
+          className="ruler-context-menu"
+          style={{ left: `${rulerContextMenu.x}px`, top: `${rulerContextMenu.y}px` }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="ruler-context-menu-item"
+            onClick={() => {
+              openWiki(rulerContextMenu.subjectName)
+              setRulerContextMenu(null)
+            }}
+          >
+            打开中文维基百科
+          </button>
         </div>
       ) : null}
     </div>
