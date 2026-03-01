@@ -15,6 +15,10 @@ const PROBE_CARD_WIDTH = 320
 const PROBE_CARD_GAP = 14
 const PROBE_CARD_MARGIN = 12
 const PROBE_INITIAL_FALLBACK_OFFSET = 1
+const SUB_TIMELINE_QUERY_KEY = 'sub'
+const TIMELINE_HISTORY_VIEW_KEY = 'timelineView'
+const TIMELINE_HISTORY_MAIN = 'main'
+const TIMELINE_HISTORY_SUB = 'sub'
 const SPRING_AUTUMN_END = -476
 const WARRING_STATES_START = -475
 
@@ -775,6 +779,7 @@ function App() {
   const probeAxisDragRef = useRef({ active: false, pointerId: null })
   const pendingScrollLeftRef = useRef(null)
   const pendingProbeRelocationRef = useRef(null)
+  const historyInitializedRef = useRef(false)
 
   const sortedDynasties = useMemo(() => {
     const merged = mergePeriodGroups(dynastyGroups)
@@ -1044,6 +1049,31 @@ function App() {
     [probeRecords]
   )
 
+  const getTimelineUrl = useCallback((dynastyId = null) => {
+    const url = new URL(window.location.href)
+    if (dynastyId) {
+      url.searchParams.set(SUB_TIMELINE_QUERY_KEY, dynastyId)
+    } else {
+      url.searchParams.delete(SUB_TIMELINE_QUERY_KEY)
+    }
+    return `${url.pathname}${url.search}${url.hash}`
+  }, [])
+
+  const syncTimelineHistory = useCallback((dynastyId = null, mode = 'push') => {
+    const state = dynastyId
+      ? { [TIMELINE_HISTORY_VIEW_KEY]: TIMELINE_HISTORY_SUB, dynastyId }
+      : { [TIMELINE_HISTORY_VIEW_KEY]: TIMELINE_HISTORY_MAIN }
+    const nextUrl = getTimelineUrl(dynastyId)
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (mode === 'replace') {
+      window.history.replaceState(state, '', nextUrl)
+      return
+    }
+    if (nextUrl !== currentUrl) {
+      window.history.pushState(state, '', nextUrl)
+    }
+  }, [getTimelineUrl])
+
   const handleCopyProbeReport = async () => {
     if (!probeReportText) {
       return
@@ -1088,7 +1118,8 @@ function App() {
     setZoom(targetZoom)
   }
 
-  const enterSubTimeline = (dynasty) => {
+  const enterSubTimeline = useCallback((dynasty, options = {}) => {
+    const { syncHistory = true, historyMode = 'push' } = options
     const bounds = getDynastyLifeBounds(dynasty)
     const sortedRulers = [...dynasty.rulers].sort(
       (a, b) => getRulerPoint(a, dynasty.startYear) - getRulerPoint(b, dynasty.startYear)
@@ -1122,17 +1153,27 @@ function App() {
       pendingScrollLeftRef.current = 0
       setZoom(fitZoom)
     }
-  }
+    if (syncHistory) {
+      syncTimelineHistory(dynasty.id, historyMode)
+    }
+  }, [isYearProbeActive, syncTimelineHistory, zoom])
 
-  const exitSubTimeline = () => {
+  const exitSubTimeline = useCallback((options = {}) => {
+    const { syncHistory = true, historyMode = 'push' } = options
     setSubTimelineId(null)
     if (timelineViewportRef.current && Math.abs(zoom - DEFAULT_SCALE) < 0.0001) {
       timelineViewportRef.current.scrollLeft = 0
+      if (syncHistory) {
+        syncTimelineHistory(null, historyMode)
+      }
       return
     }
     pendingScrollLeftRef.current = 0
     setZoom(DEFAULT_SCALE)
-  }
+    if (syncHistory) {
+      syncTimelineHistory(null, historyMode)
+    }
+  }, [syncTimelineHistory, zoom])
 
   useEffect(() => {
     if (pendingScrollLeftRef.current === null || !timelineViewportRef.current) {
@@ -1348,6 +1389,7 @@ function App() {
     setActiveDynastyIds(allDynastyFilterIds)
     setYearWindow([TIMELINE_MIN_YEAR, TIMELINE_MAX_YEAR])
     setSubTimelineId(null)
+    syncTimelineHistory(null, 'replace')
     setZoom(DEFAULT_SCALE)
     setHighlightedRulerKey(null)
   }
@@ -1469,6 +1511,51 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isSettingsOpen])
+
+  useEffect(() => {
+    if (historyInitializedRef.current) {
+      return undefined
+    }
+    historyInitializedRef.current = true
+
+    const params = new URLSearchParams(window.location.search)
+    const subId = params.get(SUB_TIMELINE_QUERY_KEY)
+    const dynastyFromUrl = subId ? dynastyLookup.get(subId) ?? null : null
+
+    if (dynastyFromUrl) {
+      const timer = window.setTimeout(() => {
+        enterSubTimeline(dynastyFromUrl, { syncHistory: true, historyMode: 'replace' })
+      }, 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    syncTimelineHistory(null, 'replace')
+    return undefined
+  }, [dynastyLookup, enterSubTimeline, syncTimelineHistory])
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const state = event.state
+      const fallbackSubId = new URLSearchParams(window.location.search).get(SUB_TIMELINE_QUERY_KEY)
+      const stateView = state?.[TIMELINE_HISTORY_VIEW_KEY]
+      const targetSubId =
+        stateView === TIMELINE_HISTORY_SUB
+          ? state?.dynastyId
+          : stateView === TIMELINE_HISTORY_MAIN
+            ? null
+            : fallbackSubId
+      const targetDynasty = targetSubId ? dynastyLookup.get(targetSubId) ?? null : null
+
+      if (targetDynasty) {
+        enterSubTimeline(targetDynasty, { syncHistory: false })
+      } else {
+        exitSubTimeline({ syncHistory: false })
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [dynastyLookup, enterSubTimeline, exitSubTimeline])
 
   return (
     <div className="app-shell">
