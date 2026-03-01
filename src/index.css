@@ -81,6 +81,12 @@ body {
   border-color: #b89364;
 }
 
+.quick-btn.active {
+  background: #8e4535;
+  border-color: #8e4535;
+  color: #fff5e8;
+}
+
 .primary-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -89,6 +95,120 @@ body {
 
 .control-block.wide {
   grid-column: 1 / -1;
+}
+
+.probe-float-card {
+  position: absolute;
+  z-index: 7;
+  padding: 0.52rem 0.56rem;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 128, 88, 0.4);
+  background: rgba(255, 251, 242, 0.96);
+  box-shadow: 0 12px 26px rgba(74, 55, 37, 0.24);
+  display: grid;
+  gap: 0.44rem;
+}
+
+.probe-float-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.probe-float-head strong {
+  display: block;
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.probe-float-head span {
+  font-size: 0.72rem;
+  color: #6f5a42;
+}
+
+.probe-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.probe-copy-status {
+  font-size: 0.74rem;
+  color: #7a5431;
+}
+
+.probe-float-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.36rem;
+}
+
+.probe-mini-btn {
+  min-width: 42px;
+  padding: 0.28rem 0.44rem;
+}
+
+.probe-year-input {
+  width: 88px;
+  border: 1px solid #ccb593;
+  border-radius: 8px;
+  padding: 0.28rem 0.34rem;
+  background: #fffefb;
+  color: #4b3f30;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
+.probe-year-input:focus {
+  outline: 2px solid rgba(143, 70, 52, 0.24);
+}
+
+.probe-info-box {
+  border: 1px solid rgba(172, 140, 104, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.9);
+  padding: 0.42rem 0.48rem;
+}
+
+.probe-list {
+  display: grid;
+  gap: 0.32rem;
+  max-height: 244px;
+  overflow: auto;
+}
+
+.probe-item {
+  display: grid;
+  gap: 0.06rem;
+  padding: 0.34rem 0.4rem;
+  border-radius: 7px;
+  border: 1px solid rgba(180, 155, 124, 0.33);
+  background: rgba(255, 250, 242, 0.9);
+}
+
+.probe-item.reigning {
+  border-color: rgba(137, 79, 45, 0.44);
+  background: rgba(255, 240, 218, 0.9);
+}
+
+.probe-item strong {
+  font-size: 0.8rem;
+}
+
+.probe-item span {
+  font-size: 0.7rem;
+  color: #5b4d3e;
+}
+
+.probe-item .probe-subline {
+  color: #7a6752;
+}
+
+.probe-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #695a49;
 }
 
 .settings-modal-backdrop {
@@ -353,6 +473,40 @@ input[type='range'] {
   height: 2px;
   width: calc(100% - 304px);
   background: linear-gradient(90deg, rgba(98, 72, 49, 0), rgba(98, 72, 49, 0.95), rgba(98, 72, 49, 0));
+}
+
+.probe-axis-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  transform: translateX(-50%);
+  z-index: 6;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 211, 145, 0) 0%,
+      rgba(255, 169, 82, 0.95) 50%,
+      rgba(255, 211, 145, 0) 100%
+    );
+  box-shadow: 0 0 10px rgba(255, 162, 72, 0.55);
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.probe-axis-label {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  transform: translateX(-50%);
+  padding: 0.04rem 0.34rem;
+  border-radius: 999px;
+  border: 1px solid rgba(173, 99, 43, 0.45);
+  background: rgba(255, 241, 218, 0.95);
+  color: #7c401e;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .tick-line {
@@ -746,6 +900,10 @@ input[type='range'] {
   .hero,
   .control-panel {
     padding: 0.88rem;
+  }
+
+  .probe-float-card {
+    width: 272px !important;
   }
 
   .name-slot {

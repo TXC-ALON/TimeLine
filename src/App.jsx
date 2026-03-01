@@ -11,6 +11,9 @@ const MIN_SCALE = 0.4
 const MAX_SCALE = 20
 const DEFAULT_SCALE = 0.85
 const WHEEL_ZOOM_FACTOR = 1.12
+const PROBE_CARD_WIDTH = 320
+const PROBE_CARD_GAP = 14
+const PROBE_CARD_MARGIN = 12
 const SPRING_AUTUMN_END = -476
 const WARRING_STATES_START = -475
 
@@ -259,6 +262,30 @@ function calcSpanYears(start, end, inclusive = false) {
   }
   const years = Math.max(0, end - start + (inclusive ? 1 : 0))
   return years
+}
+
+function toAstronomicalYear(year) {
+  if (year <= 0) {
+    return year + 1
+  }
+  return year
+}
+
+function calcSpanYearsNoYearZero(start, end, inclusive = false) {
+  if (typeof start !== 'number' || typeof end !== 'number') {
+    return null
+  }
+  const startAstro = toAstronomicalYear(start)
+  const endAstro = toAstronomicalYear(end)
+  const years = endAstro - startAstro + (inclusive ? 1 : 0)
+  return Math.max(0, years)
+}
+
+function includesYear(year, start, end) {
+  if (typeof year !== 'number' || typeof start !== 'number' || typeof end !== 'number') {
+    return false
+  }
+  return year >= Math.min(start, end) && year <= Math.max(start, end)
 }
 
 function getReignPeriods(ruler) {
@@ -707,6 +734,7 @@ function getYearTicks(startYear, endYear) {
 function App() {
   const timelineViewportRef = useRef(null)
   const dragStateRef = useRef({ active: false, startX: 0, startScrollLeft: 0 })
+  const probeAxisDragRef = useRef({ active: false, pointerId: null })
   const pendingScrollLeftRef = useRef(null)
 
   const sortedDynasties = useMemo(() => {
@@ -735,6 +763,9 @@ function App() {
   const [highlightedRulerKey, setHighlightedRulerKey] = useState(null)
   const [displaySettings, setDisplaySettings] = useState(DEFAULT_DISPLAY_SETTINGS)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isYearProbeActive, setIsYearProbeActive] = useState(false)
+  const [probeYear, setProbeYear] = useState(TIMELINE_MIN_YEAR)
+  const [probeCopyStatus, setProbeCopyStatus] = useState('')
 
   const normalizedSearch = searchText.trim().toLowerCase()
   const [windowStart, windowEnd] = yearWindow
@@ -870,6 +901,115 @@ function App() {
     const clampedYear = clamp(year, axisMinYear, axisMaxYear)
     return LABEL_WIDTH + (clampedYear - axisMinYear) * zoom
   }
+  const clampedProbeYear = clamp(Math.round(probeYear), axisMinYear, axisMaxYear)
+
+  const probeRecords = useMemo(() => {
+    if (!isYearProbeActive) {
+      return []
+    }
+
+    const records = []
+    displayDynasties.forEach((dynasty) => {
+      dynasty.visibleRulers.forEach((ruler) => {
+        const range = getRulerRange(ruler, dynasty)
+        const hasLifeBounds = typeof ruler.birthYear === 'number' && typeof ruler.deathYear === 'number'
+        const isAlive = hasLifeBounds
+          ? includesYear(clampedProbeYear, ruler.birthYear, ruler.deathYear)
+          : includesYear(clampedProbeYear, range.start, range.end)
+
+        if (!isAlive) {
+          return
+        }
+
+        const reignPeriods = getReignPeriods(ruler, dynasty)
+        const eraPeriods = getEraPeriods(ruler, reignPeriods, dynasty)
+        const isReigning = reignPeriods.some((period) => includesYear(clampedProbeYear, period.start, period.end))
+        const reignYearsSoFar = isReigning
+          ? reignPeriods.reduce((total, period) => {
+            if (clampedProbeYear < period.start) {
+              return total
+            }
+            const endAtProbe = Math.min(period.end, clampedProbeYear)
+            if (endAtProbe < period.start) {
+              return total
+            }
+            return total + (calcSpanYearsNoYearZero(period.start, endAtProbe, true) ?? 0)
+          }, 0)
+          : null
+
+        const activeEras = eraPeriods
+          .filter((period) => includesYear(clampedProbeYear, period.start, period.end))
+          .map((period) => `${period.name}（${formatAxisYear(period.start)}-${formatAxisYear(period.end)}）`)
+
+        const age = typeof ruler.birthYear === 'number'
+          ? calcSpanYearsNoYearZero(ruler.birthYear, clampedProbeYear, false)
+          : null
+
+        records.push({
+          id: ruler.id,
+          name: ruler.name,
+          title: ruler.title,
+          dynastyName: dynasty.name,
+          polityName: ruler.sourcePolity ?? null,
+          age,
+          rangeStart: range.start,
+          isReigning,
+          reignYearsSoFar,
+          activeEras
+        })
+      })
+    })
+
+    records.sort((a, b) => {
+      if (a.isReigning !== b.isReigning) {
+        return a.isReigning ? -1 : 1
+      }
+      if (a.rangeStart !== b.rangeStart) {
+        return a.rangeStart - b.rangeStart
+      }
+      return a.name.localeCompare(b.name, 'zh-Hans-CN')
+    })
+
+    return records
+  }, [clampedProbeYear, displayDynasties, isYearProbeActive])
+
+  const probeReportText = useMemo(() => {
+    if (!isYearProbeActive) {
+      return ''
+    }
+    const scopeText = isSubTimeline ? `（子时间轴：${subTimelineDynasty.name}）` : ''
+    const header = `时点：${formatYear(clampedProbeYear)}${scopeText}`
+    const summary = `在该时点存活君主：${probeRecords.length}位`
+    const rows = probeRecords.map((item, index) => {
+      const ageText = typeof item.age === 'number' ? `${item.age}岁` : '年龄未知'
+      const reignText = item.isReigning ? `在位第${item.reignYearsSoFar}年` : '未在位'
+      const eraText = item.activeEras.length > 0 ? item.activeEras.join('、') : '无对应年号'
+      const polityText = item.polityName ? ` / ${item.polityName}` : ''
+      return `${index + 1}. ${item.name}（${item.title}）- ${item.dynastyName}${polityText} | ${ageText} | ${reignText} | 年号：${eraText}`
+    })
+    return [header, summary, ...rows].join('\n')
+  }, [clampedProbeYear, isSubTimeline, isYearProbeActive, probeRecords, subTimelineDynasty])
+
+  const handleCopyProbeReport = async () => {
+    if (!probeReportText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(probeReportText)
+      setProbeCopyStatus('已复制')
+    } catch {
+      const temp = document.createElement('textarea')
+      temp.value = probeReportText
+      temp.style.position = 'fixed'
+      temp.style.opacity = '0'
+      document.body.appendChild(temp)
+      temp.select()
+      document.execCommand('copy')
+      document.body.removeChild(temp)
+      setProbeCopyStatus('已复制')
+    }
+    window.setTimeout(() => setProbeCopyStatus(''), 1400)
+  }
 
   const zoomToRange = (rangeStart, rangeEnd) => {
     if (!timelineViewportRef.current) {
@@ -979,6 +1119,90 @@ function App() {
   const handleWindowEndChange = (value) => {
     const nextEnd = Number(value)
     setYearWindow(([start]) => [start, Math.max(nextEnd, start)])
+  }
+
+  const ensureProbeCardRoom = (targetYear) => {
+    if (!timelineViewportRef.current) {
+      return
+    }
+    const viewport = timelineViewportRef.current
+    const axisX = getXByYear(targetYear)
+    const cardLeft = axisX + PROBE_CARD_GAP
+    const neededRight = cardLeft + PROBE_CARD_WIDTH + PROBE_CARD_MARGIN
+    const maxScrollLeft = Math.max(0, timelineWidth - viewport.clientWidth)
+    let nextScrollLeft = viewport.scrollLeft
+
+    if (neededRight > viewport.scrollLeft + viewport.clientWidth) {
+      nextScrollLeft = Math.min(maxScrollLeft, neededRight - viewport.clientWidth)
+    }
+
+    const minAxisPadding = 24
+    if (axisX < nextScrollLeft + minAxisPadding) {
+      nextScrollLeft = Math.max(0, axisX - minAxisPadding)
+    }
+
+    if (Math.abs(nextScrollLeft - viewport.scrollLeft) > 1) {
+      viewport.scrollLeft = nextScrollLeft
+    }
+  }
+
+  const updateProbeYear = (nextYear, ensureCardRoom = false) => {
+    if (!Number.isFinite(nextYear)) {
+      return
+    }
+    const clampedYear = clamp(Math.round(nextYear), axisMinYear, axisMaxYear)
+    setProbeYear(clampedYear)
+    if (ensureCardRoom) {
+      ensureProbeCardRoom(clampedYear)
+    }
+  }
+
+  const shiftProbeYear = (step) => {
+    updateProbeYear(clampedProbeYear + step, true)
+  }
+
+  const getProbeYearByClientX = (clientX) => {
+    if (!timelineViewportRef.current) {
+      return clampedProbeYear
+    }
+    const viewport = timelineViewportRef.current
+    const rect = viewport.getBoundingClientRect()
+    const xInContent = viewport.scrollLeft + (clientX - rect.left)
+    const year = axisMinYear + (xInContent - LABEL_WIDTH) / zoom
+    return clamp(Math.round(year), axisMinYear, axisMaxYear)
+  }
+
+  const beginProbeAxisDrag = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    probeAxisDragRef.current = {
+      active: true,
+      pointerId: event.pointerId
+    }
+    updateProbeYear(getProbeYearByClientX(event.clientX), true)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveProbeAxisDrag = (event) => {
+    const drag = probeAxisDragRef.current
+    if (!drag.active || drag.pointerId !== event.pointerId) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    updateProbeYear(getProbeYearByClientX(event.clientX), true)
+  }
+
+  const endProbeAxisDrag = (event) => {
+    const drag = probeAxisDragRef.current
+    if (!drag.active || drag.pointerId !== event.pointerId) {
+      return
+    }
+    probeAxisDragRef.current = { active: false, pointerId: null }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    event.stopPropagation()
   }
 
   const toggleCategory = (category) => {
@@ -1157,6 +1381,21 @@ function App() {
           <button className="secondary-btn quick-btn" type="button" onClick={fitViewToCurrentRange}>
             适应视图缩放
           </button>
+          <button
+            className={`secondary-btn quick-btn ${isYearProbeActive ? 'active' : ''}`}
+            type="button"
+            onClick={() => {
+              if (isYearProbeActive) {
+                setProbeCopyStatus('')
+                setIsYearProbeActive(false)
+                return
+              }
+              setIsYearProbeActive(true)
+              window.setTimeout(() => ensureProbeCardRoom(clampedProbeYear), 0)
+            }}
+          >
+            时点光轴
+          </button>
           {isSubTimeline ? (
             <button className="secondary-btn" type="button" onClick={exitSubTimeline}>
               退出子时间轴
@@ -1328,6 +1567,81 @@ function App() {
               })}
 
               <div className="axis-line" style={{ left: `${LABEL_WIDTH}px` }} />
+
+              {isYearProbeActive ? (
+                <>
+                  <div
+                    className="probe-axis-line"
+                    style={{ left: `${getXByYear(clampedProbeYear)}px` }}
+                    onPointerDown={beginProbeAxisDrag}
+                    onPointerMove={moveProbeAxisDrag}
+                    onPointerUp={endProbeAxisDrag}
+                    onPointerCancel={endProbeAxisDrag}
+                  >
+                    <span className="probe-axis-label">{formatAxisYear(clampedProbeYear)}</span>
+                  </div>
+                  <div
+                    className="probe-float-card"
+                    style={{
+                      left: `${getXByYear(clampedProbeYear) + PROBE_CARD_GAP}px`,
+                      top: `${AXIS_HEIGHT - 8}px`,
+                      width: `${PROBE_CARD_WIDTH}px`
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    <div className="probe-float-head">
+                      <div>
+                        <strong>{formatYear(clampedProbeYear)}</strong>
+                        <span>存活 {probeRecords.length} 位</span>
+                      </div>
+                      <div className="probe-head-actions">
+                        <button className="secondary-btn probe-mini-btn" type="button" onClick={handleCopyProbeReport}>
+                          复制
+                        </button>
+                        {probeCopyStatus ? <span className="probe-copy-status">{probeCopyStatus}</span> : null}
+                      </div>
+                    </div>
+                    <div className="probe-float-controls">
+                      <button className="secondary-btn probe-mini-btn" type="button" onClick={() => shiftProbeYear(-1)}>
+                        -1
+                      </button>
+                      <button className="secondary-btn probe-mini-btn" type="button" onClick={() => shiftProbeYear(1)}>
+                        +1
+                      </button>
+                      <input
+                        className="probe-year-input"
+                        type="number"
+                        min={axisMinYear}
+                        max={axisMaxYear}
+                        value={clampedProbeYear}
+                        onChange={(event) => updateProbeYear(Number(event.target.value), true)}
+                      />
+                    </div>
+                    <div className="probe-info-box">
+                      {probeRecords.length > 0 ? (
+                        <div className="probe-list">
+                          {probeRecords.map((item) => (
+                            <article key={item.id} className={`probe-item ${item.isReigning ? 'reigning' : ''}`}>
+                              <strong>
+                                {item.name}（{item.title}）
+                              </strong>
+                              <span className="probe-subline">
+                                {item.dynastyName}
+                                {item.polityName ? ` / ${item.polityName}` : ''}
+                              </span>
+                              <span>年龄：{typeof item.age === 'number' ? `${item.age}岁` : '未知'}</span>
+                              <span>{item.isReigning ? `在位第${item.reignYearsSoFar}年` : '未在位'}</span>
+                              <span>年号：{item.activeEras.length > 0 ? item.activeEras.join('、') : '无对应年号'}</span>
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="probe-empty">该时点没有匹配到存活君主。</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
 
               {displaySettings.showAxisEdgeYears ? (
                 <>
